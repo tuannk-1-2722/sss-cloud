@@ -70,6 +70,26 @@ HIL cần ghi core3.3.12, WebSockets2.7.2, nguồn và mạch đầy đủ; theo
 `VIDEO_CAPTURE`, `FB_NULL`, `VIDEO_ACK_TIMEOUT`, `VIDEO_DISCONNECTED_OR_TLS_ERROR`,
 `TLS_WAIT_FOR_VALID_CLOCK_AND_CA` và status.device_telemetry. Các phép thử bắt buộc:
 
+Chẩn đoán mất ảnh khi nối PIR (`BOOT_DIAG build=pir-net-diag-1`): firmware ghi
+`NET_DIAG`/`VIDEO_DIAG` mỗi 5 s, `SYNC_DIAG` sau response tối đa một lần/5 s.
+`pir` là mức GPIO13 hiện tại; `pir_sent` là mức lúc gửi sync; `rssi_dbm=0` khi
+Wi-Fi chưa kết nối, không phải phép đo sóng hợp lệ. `control_age_ms` và
+`video_lease_ms` cho biết tuổi sync và thời gian lease còn lại. `sent` chỉ là
+số frame đã ghi vào transport; `acked` mới đếm ACK hợp lệ. `VIDEO_SEND_FAIL`
+ghi thời gian gửi. Nhãn `CONTROL_EXPIRED`, `VIDEO_LEASE_EXPIRED`, `WIFI_DOWN`,
+`ACK_TIMEOUT`, `RX_UNEXPECTED_ACK`, `RX_INVALID_JSON`, `SEND_FAILED` chỉ ra
+nhánh đóng kết nối; chúng chưa tự chứng minh lỗi nguồn hoặc nguyên nhân gốc.
+Log mới không chứa token, SSID, JPEG hay nội dung response. Không đổi timeout,
+chân, nhịp chụp, TLS hoặc policy còi. Serial có thể tác động timing: chưa dùng
+bản chẩn đoán làm số đo hiệu năng nghiệm thu.
+
+HIL bổ sung cho bản chẩn đoán (chưa chạy trên board trong môi trường agent):
+giữ vị trí camera, nguồn, tab video và dây cố định; lấy log 2 phút với PIR nối
+đầy đủ. Xác nhận marker boot đúng bản. Nếu vẫn lỗi, đối chiếu nguyên nhân đóng
+với RSSI, mức PIR, sync RTT và ACK trước khi quyết định phép thử kế tiếp.
+Trước khi nghiệm thu firmware vẫn phải chạy H01/H05/H08/H09, kiểm còi OFF theo
+deadline khi mất control kể cả lúc log/video bận; host test không thay HIL.
+
 - DISARMED mở trang có video, không chạy AI giám sát; đóng trang thì nguồn dừng
   sau viewer TTL. ARMED đóng browser vẫn nhận diện/điều khiển; không phụ thuộc laptop.
 - Video nhận khoảng8 FPS là mục tiêu thử, không bắt AI chạy8 FPS. Đo received_fps,

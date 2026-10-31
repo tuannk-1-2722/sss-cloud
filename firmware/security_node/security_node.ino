@@ -4,6 +4,7 @@
 #include <NetworkClientSecure.h>
 #include <WebSocketsClient.h>
 #include <esp_heap_caps.h>
+#include <esp_arduino_version.h>
 #include <time.h>
 #include <sys/time.h>
 #include <new>
@@ -79,6 +80,18 @@ SharedState snapshot() {
   SharedState copy = shared;
   portEXIT_CRITICAL(&stateMux);
   return copy;
+}
+
+// Serial-only diagnostics. Never log credentials, JPEGs or server response bodies.
+// Call outside stateMux; the alarm task must not wait for diagnostic output.
+void logNetwork(const char* reason) {
+  SharedState state = snapshot();
+  uint32_t now = millis();
+  int wifi = WiFi.status();
+  Serial.printf("NET_DIAG reason=%s ms=%u wifi=%d rssi_dbm=%d pir=%d control_age_ms=%u control_rtt_ms=%u video_lease_ms=%ld heap=%u max_alloc=%u\n",
+                reason, unsigned(now), wifi, wifi == WL_CONNECTED ? int(WiFi.RSSI()) : 0,
+                digitalRead(PIR_PIN), unsigned(now-state.lastControl), unsigned(state.controlRtt),
+                long(int32_t(state.videoUntil-now)), ESP.getFreeHeap(), ESP.getMaxAllocHeap());
 }
 
 void queueOff(bool reset = false) {
@@ -317,12 +330,13 @@ void controlTask(void*) {
     uint32_t start = millis();
     int status = jsonPost("/sync", request, response);
     uint32_t rtt = millis() - start;
+    bool syncAccepted = status == 200 && rtt <= CONTROL_TIMEOUT && response["sync_seq"].as<uint32_t>() == sequence
+               && strcmp(response["session_id"] | "", state.session) == 0
+               && response["mode_revision"].as<uint32_t>() >= state.revision;
     if (status == 409 || status == 401 || status == 403) {
       queueOff();
       portENTER_CRITICAL(&stateMux); shared.session[0] = 0; shared.mode = 0; shared.videoUntil = 0; portEXIT_CRITICAL(&stateMux);
-    } else if (status == 200 && rtt <= CONTROL_TIMEOUT && response["sync_seq"].as<uint32_t>() == sequence
-               && strcmp(response["session_id"] | "", state.session) == 0
-               && response["mode_revision"].as<uint32_t>() >= state.revision) {
+    } else if (syncAccepted) {
       const char* mode = response["mode"] | "DISARMED";
       uint8_t newMode = strcmp(mode, "ARMED") == 0 ? 1 : strcmp(mode, "ENROLLMENT") == 0 ? 2 : 0;
       uint32_t revision = response["mode_revision"];
@@ -370,6 +384,14 @@ void controlTask(void*) {
                   && response["capture_lease_ms"].as<uint32_t>() == 0));
         if (xQueueSend(alarmQueue, &message, pdMS_TO_TICKS(30)) != pdTRUE) queueOff();
       }
+    }
+    static uint32_t lastSyncLog = 0;
+    if (uint32_t(millis()-lastSyncLog) >= 5000) {
+      lastSyncLog = millis();
+      Serial.printf("SYNC_DIAG ms=%u status=%d accepted=%d rtt_ms=%u pir_sent=%d video_enabled=%d lease_ms=%u\n",
+                    unsigned(lastSyncLog), status, int(syncAccepted), unsigned(rtt),
+                    int(request["pir_high"].as<bool>()), int(response["video"]["enabled"] | false),
+                    unsigned(response["video"]["lease_ms"].as<uint32_t>()));
     }
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
@@ -435,6 +457,7 @@ void captureTask(void*) {
 void videoTask(void*) {
   static VideoSocket socket;
   VideoWindow window;
+  uint32_t sentFrames=0, ackedFrames=0, lastDiag=0;
   bool configured=false, ready=false;
   char session[65]={};
   String headers=String("Authorization: Bearer ")+DEVICE_TOKEN;
@@ -453,29 +476,52 @@ void videoTask(void*) {
         String reason = (payload && length > 0) ? String((const char*)payload, length) : String("NONE");
         Serial.printf("WS_DISCONNECTED type=%d reason=%s max_alloc=%u heap=%u psram=%u\n",
                       (int)type, reason.c_str(), ESP.getMaxAllocHeap(), ESP.getFreeHeap(), ESP.getFreePsram());
+        logNetwork("WS_EVENT");
       }
     }
     if (type!=WStype_TEXT) return;
     JsonDocument response;
-    if (length>1024 || deserializeJson(response,payload,length)) { socket.disconnect(); return; }
+    if (length>1024 || deserializeJson(response,payload,length)) {
+      logNetwork("RX_INVALID_JSON"); socket.disconnect(); return;
+    }
     if (response["protocol_version"].as<int>()==1 && response["window_frames"].as<int>()==2) {
       ready=true; window.clear();
       Serial.println("WS_READY_STREAMING");
       return;
     }
     if (strcmp(response["state"] | "", "video_received")!=0 || !window.ack(response["seq"].as<uint64_t>())) {
+      logNetwork("RX_UNEXPECTED_ACK");
       socket.disconnect(); ready=false;
+    } else {
+      ++ackedFrames;
     }
   });
   for (;;) {
     SharedState state=snapshot();
     ServerAddress address=serverAddress(SERVER_URL);
     uint32_t now=millis();
+    if (uint32_t(now-lastDiag)>=5000) {
+      lastDiag=now;
+      logNetwork("PERIODIC");
+      Serial.printf("VIDEO_DIAG ms=%u sent=%u acked=%u pending=%u oldest_ack_ms=%u ready=%d\n",
+                    unsigned(now), unsigned(sentFrames), unsigned(ackedFrames), unsigned(window.count),
+                    window.count ? unsigned(now-window.sent[0]) : 0u, int(ready));
+      state=snapshot();
+      now=millis(); // Recheck leases after potentially blocking Serial output.
+    }
     bool allowed=WiFi.status()==WL_CONNECTED && state.session[0]
       && uint32_t(now-state.lastControl)<5000 && int32_t(state.videoUntil-now)>0
       && transportReady(address);
     if (!allowed || (configured && strcmp(session,state.session)!=0)) {
-      if (configured) socket.disconnect();
+      if (configured) {
+        const char* reason = WiFi.status()!=WL_CONNECTED ? "WIFI_DOWN"
+          : !state.session[0] ? "NO_SESSION"
+          : uint32_t(now-state.lastControl)>=5000 ? "CONTROL_EXPIRED"
+          : int32_t(state.videoUntil-now)<=0 ? "VIDEO_LEASE_EXPIRED"
+          : !transportReady(address) ? "TLS_NOT_READY" : "SESSION_CHANGED";
+        logNetwork(reason);
+        socket.disconnect();
+      }
       configured=ready=false; window.clear(); freeVideo(takeVideo());
       vTaskDelay(pdMS_TO_TICKS(25)); continue;
     }
@@ -495,7 +541,10 @@ void videoTask(void*) {
       strlcpy(session,state.session,sizeof(session)); configured=true;
     }
     socket.loop();
-    if (window.expired(millis())) { socket.disconnect(); ready=false; window.clear(); Serial.println("VIDEO_ACK_TIMEOUT"); }
+    if (window.expired(millis())) {
+      logNetwork("ACK_TIMEOUT");
+      socket.disconnect(); ready=false; window.clear(); Serial.println("VIDEO_ACK_TIMEOUT");
+    }
     if (ready && window.canSend()) {
       VideoFrame* frame=takeVideo();
       if (frame) {
@@ -519,8 +568,16 @@ void videoTask(void*) {
             frame->bytes[0]=uint8_t(length); frame->bytes[1]=uint8_t(length>>8);
             memcpy(frame->bytes+2,header,length);
             uint32_t start=millis();
-            if (!socket.sendVideo(frame->bytes,2+length+frame->jpegLength)
-                || !window.add(frame->seq,start)) { socket.disconnect(); ready=false; window.clear(); }
+            bool written = socket.sendVideo(frame->bytes,2+length+frame->jpegLength);
+            if (!written || !window.add(frame->seq,start)) {
+              Serial.printf("VIDEO_SEND_FAIL ms=%u seq=%llu bytes=%u elapsed_ms=%u written=%d\n",
+                            unsigned(millis()), (unsigned long long)frame->seq, unsigned(2+length+frame->jpegLength),
+                            unsigned(millis()-start), int(written));
+              logNetwork(written ? "WINDOW_FULL" : "SEND_FAILED");
+              socket.disconnect(); ready=false; window.clear();
+            } else {
+              ++sentFrames;
+            }
           }
         }
         freeVideo(frame);
@@ -535,6 +592,8 @@ void setup() {
   digitalWrite(ALARM_PIN, ALARM_ACTIVE_HIGH ? LOW : HIGH);
   pinMode(PIR_PIN, INPUT);
   Serial.begin(115200);
+  Serial.printf("BOOT_DIAG build=pir-net-diag-1 core=%s reset_reason=%d\n",
+                ESP_ARDUINO_VERSION_STR, int(esp_reset_reason()));
   for (int i = 0; i < 4; ++i) snprintf(bootId + i * 8, 9, "%08lx", (unsigned long)esp_random());
   alarmQueue = xQueueCreate(8, sizeof(AlarmMessage));
   ackQueue = xQueueCreate(8, sizeof(CommandAck));

@@ -25,6 +25,8 @@ int main() {
   assert(!window.ack(1)); assert(window.ack(2)); assert(window.ack(3));
   assert(window.canSend() && !window.expired(5000));
   window.add(4,0xfffffff0u);
-  assert(!window.expired(100)); assert(window.expired(2000));
+  assert(!window.expired(100)); assert(!window.expired(2000));
+  assert(!window.expired(2984)); // Exactly 3000 ms after 0xfffffff0, across wrap.
+  assert(window.expired(2985)); // Timeout is strictly greater than 3000 ms.
   window.clear(); assert(window.count==0);
 }
