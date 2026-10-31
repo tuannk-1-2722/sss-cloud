@@ -1,0 +1,24 @@
+{
+  "name": "Smart Security System",
+  "short_name": "Smart Security",
+  "description": "Theo dõi vùng cửa và nhận cảnh báo từ hệ thống bảo mật",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101827",
+  "theme_color": "#121d2b",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

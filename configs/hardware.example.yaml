@@ -1,0 +1,6 @@
+profile: hardware
+runtime_dir: runtime/hardware
+# Replace these rectangles after mounting the camera. Coordinates refer to bbox centers.
+zones:
+  approach: [0.05, 0.05, 0.40, 0.90]
+  doorstep: [0.55, 0.05, 0.40, 0.90]

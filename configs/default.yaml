@@ -1,0 +1,106 @@
+# This file owns all numeric defaults. Camera-specific values are seeds, not measured results.
+profile: simulation
+runtime_dir: runtime/simulation
+device_id: camera-1
+camera:
+  width: 640
+  height: 480
+  jpeg_quality: 12
+  sentinel_ms: 1000
+  active_ms: 500
+  pir_warmup_ms: 60000
+  pir_burst_ms: 10000
+  presence_hold_ms: 3000
+video:
+  view_interval_ms: 125
+  armed_interval_ms: 250
+  viewer_lease_ms: 15000
+  viewer_renew_ms: 5000
+  max_viewers: 3
+  stale_ms: 3000
+analysis:
+  monitoring_interval_ms: 300
+  enrollment_interval_ms: 1000
+zones:
+  # Synthetic left-to-right layout. MUST be replaced and validated for the actual camera.
+  approach: [0.05, 0.05, 0.40, 0.90]
+  doorstep: [0.55, 0.05, 0.40, 0.90]
+  stable_observations: 2
+policy:
+  confirm_votes: 3
+  confirmation_span_ms: 600
+  vote_window: 5 # Deprecated compatibility key; evidence is bounded by time and 128 entries.
+  vote_window_ms: 4000
+  vote_spacing_ms: 300 # Deprecated compatibility key; every distinct eligible frame contributes.
+  track_gap_ms: 2500
+  approach_history_ms: 8000
+  identity_fresh_ms: 2000
+  doorstep_dwell_ms: 800
+  unresolved_warning_ms: 5000
+  cooldown_ms: 10000
+  max_simultaneous: 2
+alarm:
+  duration_ms: 2000
+  hard_cap_ms: 3000
+  test_cap_ms: 1000
+  ttl_ms: 5000
+  control_timeout_ms: 2000
+  control_lost_ms: 5000
+  sync_ms: 1000
+limits:
+  max_frame_bytes: 524288
+  max_decode_width: 1600
+  max_decode_height: 1200
+  max_capture_age_ms: 1000
+  max_result_age_ms: 3000
+  max_uploads_per_second: 12
+  upload_burst: 4
+  device_offline_ms: 10000
+  analysis_fault_ms: 10000
+enrollment:
+  max_people: 20
+  accepted_min: 10
+  per_round_min: 5
+  gallery_min: 5
+  gallery_max: 10
+  sample_spacing_ms: 750
+  session_ms: 600000
+  duplicate_hamming_max: 2
+  face_region: [0.25, 0.10, 0.50, 0.80]
+  diversity_min_delta: 0.05
+environment:
+  # Conservative starter values: validate against labeled day/night frames before hardware demo.
+  min_median_luma: 28
+  max_clipped_ratio: 0.80
+  low_light_p95: 65
+  max_bright_ratio: 0.80
+vision:
+  opencv_threads: 2
+  face_confidence: 0.90
+  face_nms: 0.30
+  person_confidence: 0.50
+  person_nms: 0.60
+  face_min_px: 80
+  enrollment_face_min_px: 100
+  blur_min: 60
+  clipped_fraction_max: 0.40
+  accept: 0.45
+  reject: 0.30
+  margin: 0.08
+  track_iou: 0.15
+  track_center_distance: 0.25
+  ambiguity_margin: 0.10
+retention:
+  evidence_days: 7
+  events_days: 30
+  receipts_hours: 24
+  media_quota_bytes: 1073741824
+cloud:
+  # disabled until a separately hosted HTTPS cloud service is provisioned
+  inference: local
+  inference_timeout_ms: 2500
+  events_enabled: false
+notifications:
+  telegram_enabled: false
+  expiry_ms: 300000
+  max_attempts: 3

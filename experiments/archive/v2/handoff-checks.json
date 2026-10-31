@@ -1,0 +1,172 @@
+{
+  "created_at": "2026-10-01T18:10:53.310490+00:00",
+  "scope": "documentation rewrite and runnable IoT scaffold; synthetic/blank validation only",
+  "environment": {
+    "python": "3.12.14",
+    "os": "Linux-6.18.44-x86_64-with-glibc2.39"
+  },
+  "checks": [
+    {
+      "command": "pip install -r requirements-dev.txt; pip install -e .",
+      "status": "PASS"
+    },
+    {
+      "command": "python -m pytest -q",
+      "status": "PASS",
+      "passed": 49,
+      "duration_seconds": 2.92,
+      "warnings": [
+        "Starlette TestClient httpx deprecation"
+      ]
+    },
+    {
+      "command": "python -m ruff check backend tools tests",
+      "status": "PASS"
+    },
+    {
+      "command": "python -m ruff format --check backend tools tests",
+      "status": "PASS",
+      "files": 28
+    },
+    {
+      "command": "node --check backend/security_app/static/app.js",
+      "status": "PASS"
+    },
+    {
+      "command": "g++ -std=c++17 -Wall -Wextra -Werror tests/firmware/alarm_logic_test.cpp; run binary",
+      "status": "PASS",
+      "scope": "AlarmLogic.h only"
+    },
+    {
+      "command": "python -m tools.download_models",
+      "status": "PASS",
+      "artifacts_verified": 7
+    },
+    {
+      "command": "python -m tools.manage models-smoke",
+      "status": "PASS",
+      "embedding_dimension": 128,
+      "blank_persons": 0,
+      "blank_faces": 0
+    },
+    {
+      "command": "run_visits with OpenCVVision and two blank synthetic JPEGs",
+      "status": "PASS",
+      "frames": 2,
+      "events": 0
+    },
+    {
+      "command": "python -m tools.smoke_integration",
+      "status": "PASS",
+      "result": {
+        "source": "simulation",
+        "physical_buzzer_tested": false,
+        "face_accuracy_tested": false,
+        "scenarios": [
+          {
+            "scenario": "unknown",
+            "event": "unknown_approach",
+            "command": "acked",
+            "simulated_buzzer_final": "OFF"
+          },
+          {
+            "scenario": "direct-b",
+            "event": "unresolved_presence",
+            "audible": false
+          },
+          {
+            "scenario": "known",
+            "event": "known_visit",
+            "audible": false
+          }
+        ],
+        "result": "PASS"
+      }
+    },
+    {
+      "command": "resolve local Markdown file links",
+      "status": "PASS"
+    },
+    {
+      "command": "arduino-cli 1.2.2 compile --profile ai_thinker firmware/security_node",
+      "status": "BLOCKED",
+      "reason": "CLI DNS/network unreachable while downloading indexes; esp32 platform and ArduinoJson not installed"
+    },
+    {
+      "command": "GitHub Actions workflow",
+      "status": "NOT_RUN"
+    },
+    {
+      "command": "g++ -std=c++17 -Wall -Wextra -Werror tests/firmware/frame_freshness_test.cpp; run binary",
+      "status": "PASS",
+      "scope": "First-DMA frame age math, invalid/future/stale/overflow; full capture task remains untested"
+    }
+  ],
+  "not_validated": [
+    "full ESP32 sketch compilation",
+    "physical source/pins/buzzer/PIR/camera/PSRAM",
+    "HIL and scheduling",
+    "real-face enrollment/accuracy",
+    "20-person gallery and simultaneous real people",
+    "end-to-end latency and 30-minute stability",
+    "Windows and phone UI",
+    "real Telegram delivery"
+  ],
+  "source_sha256": {
+    ".github/workflows/checks.yml": "b4e2d97f16c4e7468bcf85bdce45166198c88d8fd8e90028a3a05b6995ea4d52",
+    ".gitignore": "830174753db4a063fbbe0376fdca66b8cbb0f43e012226c7f635d839218f3e6c",
+    "backend/security_app/__init__.py": "f49ec2ca7bd4537ba58c283bf16399d5636aee77f4e1ec2ad1ee1bb0b37a1d55",
+    "backend/security_app/auth.py": "421d508d93e27a767b1bf1aeb7cd134ad7eda8305b04aeefbad457feb7a4590b",
+    "backend/security_app/config.py": "bd7e4898ebfd33f6c261e9568f47fb65eb2ca3dd31dc98007cd879180a884273",
+    "backend/security_app/contracts.py": "fcf8038deb6269e297ecacf583510ec5435f6b89a0c562a5498704318b74557d",
+    "backend/security_app/main.py": "07e010c5ce7cf851c13db35036e485d13007c5eff4139abdbecac3862cc4d4f5",
+    "backend/security_app/matching.py": "2f024784c134ce0a22050c380d210aa8afa24875d8ec20407e7cedc2e4499a18",
+    "backend/security_app/migrations/001_initial.sql": "b1ebb051bc453afa16f9f1822184e425665fecf803f8c444502b2ddfdf64691a",
+    "backend/security_app/notifications.py": "661cb755400aef30dfa10c5afa55950fa6e66e2fa256e71d3c3efb493bdf41cb",
+    "backend/security_app/policy.py": "afcefcae6d3afe03bddc932e685defddb192b9a3cb35b3a7b9f8ea70b82ca397",
+    "backend/security_app/service.py": "e559515273fb97283b6691a5deb4ffcedfd494785fb7faa728414ea3d5b4e236",
+    "backend/security_app/spatial.py": "0bd45e4f9a0b4a50def45b3389de6904cd2ac0339d31459929496494cc598a09",
+    "backend/security_app/static/app.css": "a7569a19e105b4c4f225cbd7fdb4da399e48a49bb3843e749baf838ee2c7f0e6",
+    "backend/security_app/static/app.js": "36b456d54b113c4071dca86cbe96b739550dbbf97f374adb7eb287e8ed7573fa",
+    "backend/security_app/storage.py": "8d003491a87b82adf1e5dfbae7573471f614c8f8515e07aef1e700ba08440a11",
+    "backend/security_app/templates/dashboard.html": "4cc7ec0fcf308d219d50c4a2db5b4f0fc324c9c615581dc9b342af74905e4eda",
+    "backend/security_app/vision.py": "cff1973f8404cea8ae4d220eaed8ab8c0974bb601cfadbdd9dfab9a268f8c88a",
+    "configs/calibration.seed.json": "61d161ea656ff82cef32ab93be9dcf34c895883b33df149be81621ac4079677e",
+    "configs/default.yaml": "fc82c3359a8a2209a9d917156fd13efaab4582d8c93204eb8831b213a6473888",
+    "configs/hardware.example.yaml": "56fea2f647940cda47cc1250b1d4135a7181cd885b99f263f2ccfab60ffa9024",
+    "firmware/security_node/AlarmLogic.h": "167eed630af788e9592acaf9e8d15ba3f9c826c2a6f07df2c615ace8d59c1259",
+    "firmware/security_node/FrameFreshness.h": "beb4b0eb831979d21e785a8e9a83d3ea1b7c81da25a74e70fd29a70bdfce0cc5",
+    "firmware/security_node/secrets.example.h": "adaee904731d021a076e787da1e599a0bd5d3181915fb236bdd87531c6697ba6",
+    "firmware/security_node/security_node.ino": "5eb7596e8476c3b8687b9105ea59fb5aa0e6397c6de0ae463d9ff549f0f79416",
+    "firmware/security_node/sketch.yaml": "46c8bce8edf632ec28b55bcb5a08fdd6c8d5be2ce2ee34bfb25d36a6aed61041",
+    "models/licenses/nanodet.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "models/licenses/sface.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "models/licenses/yunet.txt": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958",
+    "models/manifest.json": "52de1be4c2d17dc9d206120958fa3a05db2f5c06fa952697d4ff7052075790e7",
+    "models/vendor/nanodet.py": "5ba84922eaefdc48d0066cffdfb721d0d434c5f3b92213563161e00da26cea1b",
+    "pyproject.toml": "9ae41237ac8c11feb06b41760071b3b036c76e2a775d1de4eff023d970569713",
+    "requirements-dev.in": "008aa8eb219689bb793ba16ebad9bdf73506f2b1f5588ef8e0542946e00fc498",
+    "requirements-dev.txt": "39dbc3b5178cd92093be582ccfde457ef929b7f82e523f3cad80d744094374f3",
+    "requirements.in": "1df90b4577659a50e57be4fdeb1de17a07cb186ce50bb88dcb0d83c767f61ac2",
+    "requirements.txt": "948f5e036f27b5be6df9cc518e6c39612e3e256b364bf54b7c461f8c3e2969eb",
+    "tests/conftest.py": "7792219a880029d701f65403830abcc90dddf8f371c414c0860619c98ba821b5",
+    "tests/firmware/alarm_logic_test.cpp": "31badb53680b59bc6260e6532c188bc3f62e3b60a8480033cadfd44cfdd096f2",
+    "tests/firmware/frame_freshness_test.cpp": "deef3e7a8175f54dd3a164edb539e457152c6180afd5537ec84debe3409bffef",
+    "tests/test_api.py": "44f0f281373763efa2ae0d16694b3b3c58bd556b97b6ef73696dc4f58259825b",
+    "tests/test_device_commands.py": "1f45950f2f138e1f3de9800c648b17abdbb4f8555626939f2262b17c86f3dba1",
+    "tests/test_enrollment.py": "edcf5924528eec2739e249943c71f408ef62417ab5c20fc6e64b3865527b033e",
+    "tests/test_evaluate.py": "bb5c153c6bf04ae3b882357348d3102fd3ae9cb6e271250cc41ffd5655bd705e",
+    "tests/test_policy.py": "42fb964fc5205613992a744eb663074b88028ba9c283d6141bbf1f0120172257",
+    "tests/test_service.py": "f13cbd2f6f6c4c99133c33c0a8f3a76ebf7cedf070d91172ff096b5b9a991eb8",
+    "tests/test_storage.py": "67937c35cd85eadd438ec6c10dbc58c79fb1f15482298d7ccf616729792d1261",
+    "tests/test_vision_math.py": "1c4ee8eb2aa1bb258648d46e1b7c549d62c79a00250fff0e34bc75213db33546",
+    "tools/__init__.py": "2eccadedd963ba8ffddcb5fcaf21095e9493e926f46fd8d8cbdb08cef544abc7",
+    "tools/device_simulator.py": "c1885b97ff27c55cb6b2f3e963592d5c3f19fe8fdb88e9db4f4f2b05c066ae53",
+    "tools/download_models.py": "999dde21988959925ef3d51d5ad9d1d2181fb92829c5a1ce257fe55509950780",
+    "tools/evaluate.py": "59658f3347846c74db4ac9569c239f3a678c5deadd23294db8feb565772c1e43",
+    "tools/manage.py": "bcac4f8abee6d326c0793aa6745d0c72c931f957778590e7b8ed0a90cf4eb713",
+    "tools/record_visit.py": "fa0b6b46ca2cc9dbfaf1347136ec78f8eb0838e7ffb0866e3d9a9115b90023b1",
+    "tools/smoke_integration.py": "e04d600f42a5e169220f6f80a0d12d89274960aa76a0b0bbb1ce3f2aae45d570"
+  },
+  "model_manifest_sha256": "52de1be4c2d17dc9d206120958fa3a05db2f5c06fa952697d4ff7052075790e7"
+}

@@ -1,0 +1,24 @@
+{
+  "source": "simulation",
+  "physical_buzzer_tested": false,
+  "face_accuracy_tested": false,
+  "scenarios": [
+    {
+      "scenario": "unknown",
+      "event": "unknown_approach",
+      "command": "acked",
+      "simulated_buzzer_final": "OFF"
+    },
+    {
+      "scenario": "direct-b",
+      "event": "unresolved_presence",
+      "audible": false
+    },
+    {
+      "scenario": "known",
+      "event": "known_visit",
+      "audible": false
+    }
+  ],
+  "result": "PASS"
+}

@@ -1,0 +1,11 @@
+{
+  "state": "seed",
+  "calibration_id": "NOT-VALIDATED",
+  "validated_gallery_limit": 0,
+  "model_set_id": "opencv-zoo-cpu-v1",
+  "camera_profile_hash": "",
+  "model_manifest_sha256": "",
+  "validation_report": "",
+  "reviewer": "",
+  "metrics": {}
+}

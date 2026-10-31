@@ -1,0 +1,11 @@
+fastapi==0.142.2
+uvicorn==0.54.0
+websockets==16.0
+pydantic==2.13.5
+numpy==2.2.6
+opencv-python-headless==4.13.0.92
+Pillow==12.3.0
+PyYAML==6.0.3
+filelock==4.0.8
+argon2-cffi==25.1.0
+httpx==0.28.1

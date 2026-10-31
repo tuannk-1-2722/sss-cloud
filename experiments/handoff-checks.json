@@ -1,0 +1,540 @@
+{
+  "date": "2026-10-02",
+  "application_version": "2.1.0",
+  "protocol_version": 2,
+  "input_archive_sha256": "ea12c75564b47904e6c7ad1e09b20a7309a0faa9be5c79aa4ffb2a3b34c8fac0",
+  "environment": {
+    "python": "3.12.14",
+    "os": "Linux-6.18.44-x86_64-with-glibc2.39"
+  },
+  "checks": {
+    "original_pytest": {
+      "passed": 49
+    },
+    "initial_new_regressions_on_original": {
+      "failed": 19,
+      "passed": 2
+    },
+    "final_pytest": {
+      "passed": 84,
+      "warnings": [
+        "Starlette TestClient/httpx deprecation"
+      ]
+    },
+    "ruff_lint": "PASS",
+    "ruff_format": "PASS",
+    "javascript_syntax": "PASS",
+    "cpp_host_tests": "PASS",
+    "http_integration": "PASS",
+    "model_sha256_and_blank_smoke": "PASS",
+    "full_esp32_compile": "BLOCKED: Arduino CLI index/core download DNS failure",
+    "physical_hil": "NOT RUN",
+    "real_face_accuracy": "NOT RUN",
+    "browser_ui": "NOT RUN",
+    "windows": "NOT RUN",
+    "remote_ci": "NOT RUN"
+  },
+  "input_file_inventory": [
+    {
+      "path": ".github/ISSUE_TEMPLATE/task.md",
+      "original_sha256": "a950961a5f8a89ccd54eb1d515466502ddfa29244ce37bef4c566c3a0681176e",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "original_sha256": "a8c7fceb0281defa42267161d97b6800a2d2b47062671b5fa1ce996c1ba9e2e2",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": ".github/workflows/checks.yml",
+      "original_sha256": "b4e2d97f16c4e7468bcf85bdce45166198c88d8fd8e90028a3a05b6995ea4d52",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": ".gitignore",
+      "original_sha256": "830174753db4a063fbbe0376fdca66b8cbb0f43e012226c7f635d839218f3e6c",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_sha256": "f9596b0109905be6cc82deee4b2bf54c9a574924b92c16184f5359983148d3f7",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "README.md",
+      "original_sha256": "582efbb64839619d4f341cb0587eb59c3bb1cd180a0c513a638f01d8d6a7edc0",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "THIRD_PARTY.md",
+      "original_sha256": "979545625ebceefe4222cd57968c39c73f4685616c5162e680ab6f2406b14bb0",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/__init__.py",
+      "original_sha256": "f49ec2ca7bd4537ba58c283bf16399d5636aee77f4e1ec2ad1ee1bb0b37a1d55",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/auth.py",
+      "original_sha256": "421d508d93e27a767b1bf1aeb7cd134ad7eda8305b04aeefbad457feb7a4590b",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/config.py",
+      "original_sha256": "bd7e4898ebfd33f6c261e9568f47fb65eb2ca3dd31dc98007cd879180a884273",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/contracts.py",
+      "original_sha256": "fcf8038deb6269e297ecacf583510ec5435f6b89a0c562a5498704318b74557d",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/main.py",
+      "original_sha256": "07e010c5ce7cf851c13db35036e485d13007c5eff4139abdbecac3862cc4d4f5",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/matching.py",
+      "original_sha256": "2f024784c134ce0a22050c380d210aa8afa24875d8ec20407e7cedc2e4499a18",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/migrations/001_initial.sql",
+      "original_sha256": "b1ebb051bc453afa16f9f1822184e425665fecf803f8c444502b2ddfdf64691a",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/notifications.py",
+      "original_sha256": "661cb755400aef30dfa10c5afa55950fa6e66e2fa256e71d3c3efb493bdf41cb",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/policy.py",
+      "original_sha256": "afcefcae6d3afe03bddc932e685defddb192b9a3cb35b3a7b9f8ea70b82ca397",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/service.py",
+      "original_sha256": "e559515273fb97283b6691a5deb4ffcedfd494785fb7faa728414ea3d5b4e236",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/spatial.py",
+      "original_sha256": "0bd45e4f9a0b4a50def45b3389de6904cd2ac0339d31459929496494cc598a09",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/static/app.css",
+      "original_sha256": "a7569a19e105b4c4f225cbd7fdb4da399e48a49bb3843e749baf838ee2c7f0e6",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/static/app.js",
+      "original_sha256": "36b456d54b113c4071dca86cbe96b739550dbbf97f374adb7eb287e8ed7573fa",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/storage.py",
+      "original_sha256": "8d003491a87b82adf1e5dfbae7573471f614c8f8515e07aef1e700ba08440a11",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/templates/dashboard.html",
+      "original_sha256": "4cc7ec0fcf308d219d50c4a2db5b4f0fc324c9c615581dc9b342af74905e4eda",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "backend/security_app/vision.py",
+      "original_sha256": "cff1973f8404cea8ae4d220eaed8ab8c0974bb601cfadbdd9dfab9a268f8c88a",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "configs/calibration.seed.json",
+      "original_sha256": "61d161ea656ff82cef32ab93be9dcf34c895883b33df149be81621ac4079677e",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "configs/default.yaml",
+      "original_sha256": "fc82c3359a8a2209a9d917156fd13efaab4582d8c93204eb8831b213a6473888",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "configs/hardware.example.yaml",
+      "original_sha256": "56fea2f647940cda47cc1250b1d4135a7181cd885b99f263f2ccfab60ffa9024",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "docs/CONTRACTS.md",
+      "original_sha256": "556b1b257499d360a59b97620696dd999adb2f9a3f67b1844b4de2fdae1c9ff9",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "docs/PLAN.md",
+      "original_sha256": "e38b4e78ccff0fb10cc44aad584d363be22b54183ae62bf9656667a2e00baba2",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "docs/RESEARCH.md",
+      "original_sha256": "122a037ea7804a2ee1dcc02d2cc4bbb2baacaf55da927390b27b895bfb186b9e",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "docs/SPEC.md",
+      "original_sha256": "970c6d8bad0b10a350191e74e7293fb90a6a5c97a7374d01517d6135ca42ef46",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "docs/TEAM_GUIDE.md",
+      "original_sha256": "dfa25a73ad7ac0002ab4fdfaf11d1b1ab8bb3b2fd576f98f21922dcf340ae278",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "docs/VALIDATION.md",
+      "original_sha256": "2bfc97b28d4f0fa92f2713883d54bc918472a2e93b413d6f7c5d7ff4252565e1",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "experiments/HANDOFF.md",
+      "original_sha256": "9c7826025f7e67ce11b23d6a9560ce97cd369703d45ba2223ea87b4d9701cc58",
+      "disposition": "archived original; replaced current evidence",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "experiments/HIL_TEMPLATE.md",
+      "original_sha256": "9bdaa74fe891e07a449685663cffcdd36463b14585b01a0aefd2ab245b9bbf09",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "experiments/REPORT_TEMPLATE.md",
+      "original_sha256": "426780681c5966451ab73acd6a5fc78456e824ef8e072b0e41d96edb41862c83",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "experiments/handoff-checks.json",
+      "original_sha256": "8f8d54f61faf5650d9ba2964b1b13d190563d394bd30bf7da80b1b59be299756",
+      "disposition": "archived original; replaced current evidence",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "firmware/security_node/AlarmLogic.h",
+      "original_sha256": "167eed630af788e9592acaf9e8d15ba3f9c826c2a6f07df2c615ace8d59c1259",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "firmware/security_node/FrameFreshness.h",
+      "original_sha256": "beb4b0eb831979d21e785a8e9a83d3ea1b7c81da25a74e70fd29a70bdfce0cc5",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "firmware/security_node/secrets.example.h",
+      "original_sha256": "adaee904731d021a076e787da1e599a0bd5d3181915fb236bdd87531c6697ba6",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "firmware/security_node/security_node.ino",
+      "original_sha256": "5eb7596e8476c3b8687b9105ea59fb5aa0e6397c6de0ae463d9ff549f0f79416",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "firmware/security_node/sketch.yaml",
+      "original_sha256": "46c8bce8edf632ec28b55bcb5a08fdd6c8d5be2ce2ee34bfb25d36a6aed61041",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "models/licenses/nanodet.txt",
+      "original_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "models/licenses/sface.txt",
+      "original_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "models/licenses/yunet.txt",
+      "original_sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "models/manifest.json",
+      "original_sha256": "52de1be4c2d17dc9d206120958fa3a05db2f5c06fa952697d4ff7052075790e7",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "models/vendor/nanodet.py",
+      "original_sha256": "5ba84922eaefdc48d0066cffdfb721d0d434c5f3b92213563161e00da26cea1b",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "pyproject.toml",
+      "original_sha256": "9ae41237ac8c11feb06b41760071b3b036c76e2a775d1de4eff023d970569713",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "requirements-dev.in",
+      "original_sha256": "008aa8eb219689bb793ba16ebad9bdf73506f2b1f5588ef8e0542946e00fc498",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "requirements-dev.txt",
+      "original_sha256": "39dbc3b5178cd92093be582ccfde457ef929b7f82e523f3cad80d744094374f3",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "requirements.in",
+      "original_sha256": "1df90b4577659a50e57be4fdeb1de17a07cb186ce50bb88dcb0d83c767f61ac2",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "requirements.txt",
+      "original_sha256": "948f5e036f27b5be6df9cc518e6c39612e3e256b364bf54b7c461f8c3e2969eb",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/conftest.py",
+      "original_sha256": "7792219a880029d701f65403830abcc90dddf8f371c414c0860619c98ba821b5",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/firmware/alarm_logic_test.cpp",
+      "original_sha256": "31badb53680b59bc6260e6532c188bc3f62e3b60a8480033cadfd44cfdd096f2",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/firmware/frame_freshness_test.cpp",
+      "original_sha256": "deef3e7a8175f54dd3a164edb539e457152c6180afd5537ec84debe3409bffef",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/test_api.py",
+      "original_sha256": "44f0f281373763efa2ae0d16694b3b3c58bd556b97b6ef73696dc4f58259825b",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/test_device_commands.py",
+      "original_sha256": "1f45950f2f138e1f3de9800c648b17abdbb4f8555626939f2262b17c86f3dba1",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/test_enrollment.py",
+      "original_sha256": "edcf5924528eec2739e249943c71f408ef62417ab5c20fc6e64b3865527b033e",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/test_evaluate.py",
+      "original_sha256": "bb5c153c6bf04ae3b882357348d3102fd3ae9cb6e271250cc41ffd5655bd705e",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/test_policy.py",
+      "original_sha256": "42fb964fc5205613992a744eb663074b88028ba9c283d6141bbf1f0120172257",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/test_service.py",
+      "original_sha256": "f13cbd2f6f6c4c99133c33c0a8f3a76ebf7cedf070d91172ff096b5b9a991eb8",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/test_storage.py",
+      "original_sha256": "67937c35cd85eadd438ec6c10dbc58c79fb1f15482298d7ccf616729792d1261",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tests/test_vision_math.py",
+      "original_sha256": "1c4ee8eb2aa1bb258648d46e1b7c549d62c79a00250fff0e34bc75213db33546",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tools/__init__.py",
+      "original_sha256": "2eccadedd963ba8ffddcb5fcaf21095e9493e926f46fd8d8cbdb08cef544abc7",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tools/device_simulator.py",
+      "original_sha256": "c1885b97ff27c55cb6b2f3e963592d5c3f19fe8fdb88e9db4f4f2b05c066ae53",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tools/download_models.py",
+      "original_sha256": "999dde21988959925ef3d51d5ad9d1d2181fb92829c5a1ce257fe55509950780",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tools/evaluate.py",
+      "original_sha256": "59658f3347846c74db4ac9569c239f3a678c5deadd23294db8feb565772c1e43",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tools/manage.py",
+      "original_sha256": "bcac4f8abee6d326c0793aa6745d0c72c931f957778590e7b8ed0a90cf4eb713",
+      "disposition": "modified",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tools/record_visit.py",
+      "original_sha256": "fa0b6b46ca2cc9dbfaf1347136ec78f8eb0838e7ffb0866e3d9a9115b90023b1",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    },
+    {
+      "path": "tools/smoke_integration.py",
+      "original_sha256": "e04d600f42a5e169220f6f80a0d12d89274960aa76a0b0bbb1ce3f2aae45d570",
+      "disposition": "retained",
+      "review": "source/document inspection; verification scope in docs/REVIEW.md and HANDOFF.md"
+    }
+  ],
+  "reviewed_source_sha256": {
+    ".github/ISSUE_TEMPLATE/task.md": "a950961a5f8a89ccd54eb1d515466502ddfa29244ce37bef4c566c3a0681176e",
+    ".github/pull_request_template.md": "a8c7fceb0281defa42267161d97b6800a2d2b47062671b5fa1ce996c1ba9e2e2",
+    ".github/workflows/checks.yml": "b4e2d97f16c4e7468bcf85bdce45166198c88d8fd8e90028a3a05b6995ea4d52",
+    ".gitignore": "830174753db4a063fbbe0376fdca66b8cbb0f43e012226c7f635d839218f3e6c",
+    "AGENTS.md": "55a60d2f2510e41d57238c8587f8a10b3fd46dab7b0c1e917e16b0727295fb5d",
+    "README.md": "b53f102db6eda0294dcd6fb5506f43203e5b9f43c0fc75bf90753a9dd988d787",
+    "THIRD_PARTY.md": "979545625ebceefe4222cd57968c39c73f4685616c5162e680ab6f2406b14bb0",
+    "backend/security_app/__init__.py": "f49ec2ca7bd4537ba58c283bf16399d5636aee77f4e1ec2ad1ee1bb0b37a1d55",
+    "backend/security_app/auth.py": "be411e7ede7d6be3a7242d099baa97f1325e039ea96ff12afa853f0559c0fa42",
+    "backend/security_app/config.py": "1d15fed7dff8e1c15b01080f35f9812b4d6375497b4f5bbc4a72111109307d45",
+    "backend/security_app/contracts.py": "cad6c3d12b7cbc8512bb99cdc00c59124e144a790ae30e04a983cfc7368eaa87",
+    "backend/security_app/enrollment.py": "e03abfba7a7a7c81dba75e946878c3188db41adf132d21da35832cc868fb77f0",
+    "backend/security_app/main.py": "def9c8a3b98c9de4bd0ec87c8a608f22d25dc3ffd3869861135ea9f52be79b9c",
+    "backend/security_app/matching.py": "2f024784c134ce0a22050c380d210aa8afa24875d8ec20407e7cedc2e4499a18",
+    "backend/security_app/migrations/001_initial.sql": "b1ebb051bc453afa16f9f1822184e425665fecf803f8c444502b2ddfdf64691a",
+    "backend/security_app/notifications.py": "3b2d30b0e6772525266ff443338ac74ac5099170809613a2e891110dff74a6b7",
+    "backend/security_app/policy.py": "1b21c5edb58095cfff449613566338eca3f4fb05f8be162fd643cfb4a0d7594d",
+    "backend/security_app/ports.py": "72a8d1b0e911d6dd9afa47242c63339e37749ce2bf78e669b07cff68d3c2e855",
+    "backend/security_app/runtime.py": "aa00ffac6358961a7470f6f1d2c3477490c9eb706a112ed287d410182e214107",
+    "backend/security_app/service.py": "b360fae46e861252611696aa8120a081af9976eb1d7da2efb307f10932bbcb21",
+    "backend/security_app/spatial.py": "0bd45e4f9a0b4a50def45b3389de6904cd2ac0339d31459929496494cc598a09",
+    "backend/security_app/static/app.css": "a0e06e7f7594b1fde7f43263dcb63913f108aa497809973fbdd8a2591100c301",
+    "backend/security_app/static/app.js": "561105ac6accedb6ab4b1fa5d05f57b392e3e2b5f21749ddb7b005388d35f0bf",
+    "backend/security_app/storage.py": "23279db015832f4333e68251e9938a60f1f6fe8a0b69d2d5f8da62f05422e0e9",
+    "backend/security_app/templates/dashboard.html": "5d77782d6a4ce5b36dc8cd5a6ee870801148987cdb8a7697c292f3ea0b9d524e",
+    "backend/security_app/tracking.py": "7fc12cc51308a59d92fa6401d7fdec6477d9d1f7414c9f40c7c86b59ef88990c",
+    "backend/security_app/vision.py": "ad8cc50fdcf80cf0b349234c9204c4fe94af5e9362690457f2019a76345d02f7",
+    "backend/security_app/worker.py": "fed22919019c1fa29124981a5738e8d635ef3e03e07f8833190227488b70b7f9",
+    "configs/calibration.seed.json": "61d161ea656ff82cef32ab93be9dcf34c895883b33df149be81621ac4079677e",
+    "configs/default.yaml": "fc82c3359a8a2209a9d917156fd13efaab4582d8c93204eb8831b213a6473888",
+    "configs/hardware.example.yaml": "56fea2f647940cda47cc1250b1d4135a7181cd885b99f263f2ccfab60ffa9024",
+    "docs/ARCHITECTURE.md": "71997a4fe966cba1e4c8df6d930c795c7ae2804a50289f82baa7e8f0fef75d5f",
+    "docs/CONTRACTS.md": "de60b6cc2eed8b6c3245b77d1003b70f419b5c9c33021058cda45f8ff5564247",
+    "docs/PLAN.md": "3586252a6d93f4d6c2141e9cbc0cda09da43414fbf11212153bd6a3e966d81a8",
+    "docs/RESEARCH.md": "34be5545e51d8eca1f5c1caa05a2a73951b92a211a12cb5104fd09bf06a28863",
+    "docs/REVIEW.md": "fe14dd503fb8800b1ee0b4f3ef224a309942a3383342bc68296f529e000c5878",
+    "docs/SPEC.md": "7c4711d5bccd877a588f23112103ae17220d5de0ebd1a39c20a00a0dc5022635",
+    "docs/TEAM_GUIDE.md": "0c302c547491e20d159172148bb96e35760677a1004c673c4c5d71e2d7034f40",
+    "docs/VALIDATION.md": "36130fc8a2d5eb95e0aebb81f83963f948a305fcedd72523a2e629ec5caa42f2",
+    "experiments/HANDOFF.md": "b3916f357c4ac51b9895f225bf80feb1baa27c5269a04c49f9984c0b31f3efdf",
+    "experiments/HIL_TEMPLATE.md": "9bdaa74fe891e07a449685663cffcdd36463b14585b01a0aefd2ab245b9bbf09",
+    "experiments/REPORT_TEMPLATE.md": "426780681c5966451ab73acd6a5fc78456e824ef8e072b0e41d96edb41862c83",
+    "experiments/archive/v2/HANDOFF.md": "9c7826025f7e67ce11b23d6a9560ce97cd369703d45ba2223ea87b4d9701cc58",
+    "experiments/review-evidence/baseline-regressions.txt": "24a192141976cc2666d4f5ed8cf1477f0c56f62ef8b5a7575d5d1c583eabaadf",
+    "experiments/review-evidence/http-smoke.json": "e4e57ad977b8195ac2e6c54e30cca75cbc3a403237b46e9dd161d74a11feb57b",
+    "experiments/review-evidence/software-checks.txt": "1653a0d1a523bc9f5f0a47c79150316d99f1287b0fa5f51ace457547ed22f40b",
+    "firmware/security_node/AlarmLogic.h": "d216f6a39da3eb274584b87f27be1806c2466648ac8346dcf93adcf446d1d8a8",
+    "firmware/security_node/FrameFreshness.h": "beb4b0eb831979d21e785a8e9a83d3ea1b7c81da25a74e70fd29a70bdfce0cc5",
+    "firmware/security_node/NodeState.h": "f69386884919febcd5c853615135064b1c554f4865747b8092da15fd440b770b",
+    "firmware/security_node/secrets.example.h": "adaee904731d021a076e787da1e599a0bd5d3181915fb236bdd87531c6697ba6",
+    "firmware/security_node/security_node.ino": "5b5eee88e182f99b0de65839b29967851f4800c93dab8467e21cd65085a3a879",
+    "firmware/security_node/sketch.yaml": "46c8bce8edf632ec28b55bcb5a08fdd6c8d5be2ce2ee34bfb25d36a6aed61041",
+    "models/licenses/nanodet.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "models/licenses/sface.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "models/licenses/yunet.txt": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958",
+    "models/manifest.json": "52de1be4c2d17dc9d206120958fa3a05db2f5c06fa952697d4ff7052075790e7",
+    "models/vendor/nanodet.py": "5ba84922eaefdc48d0066cffdfb721d0d434c5f3b92213563161e00da26cea1b",
+    "pyproject.toml": "6843eb8c3d06ebfbfdcf7730755b088403463a003975dcbcb06ed8543089f049",
+    "requirements-dev.in": "008aa8eb219689bb793ba16ebad9bdf73506f2b1f5588ef8e0542946e00fc498",
+    "requirements-dev.txt": "39dbc3b5178cd92093be582ccfde457ef929b7f82e523f3cad80d744094374f3",
+    "requirements.in": "1df90b4577659a50e57be4fdeb1de17a07cb186ce50bb88dcb0d83c767f61ac2",
+    "requirements.txt": "948f5e036f27b5be6df9cc518e6c39612e3e256b364bf54b7c461f8c3e2969eb",
+    "tests/conftest.py": "62cb93a37d8a2dd5c07a1cd7cf68ec386a736efbf44235083e984d03584e4534",
+    "tests/firmware/alarm_logic_test.cpp": "b7c3e2a4146603d5c9555534da3a969ef6d78c776e209cff631cf283c7f46d70",
+    "tests/firmware/frame_freshness_test.cpp": "deef3e7a8175f54dd3a164edb539e457152c6180afd5537ec84debe3409bffef",
+    "tests/test_api.py": "14a532bd1337646bcf45c118a4ce8915e2dd6028d6767c019530d8e278fd76ea",
+    "tests/test_device_commands.py": "1f45950f2f138e1f3de9800c648b17abdbb4f8555626939f2262b17c86f3dba1",
+    "tests/test_enrollment.py": "7e578798ba092245b7b2e070b5154043da8fd7e0046257ed80ff1ca57d1f5e58",
+    "tests/test_evaluate.py": "bb5c153c6bf04ae3b882357348d3102fd3ae9cb6e271250cc41ffd5655bd705e",
+    "tests/test_foundation.py": "82365388a0493f6cc601f6389534d28278a2bed6f5ddba006f516fe7c66c3368",
+    "tests/test_notifications.py": "9956c033b2bc195b5e304f7f7a2b0155ee2d5511903aa807ce226e944acd60bf",
+    "tests/test_policy.py": "42fb964fc5205613992a744eb663074b88028ba9c283d6141bbf1f0120172257",
+    "tests/test_review_regressions.py": "9e051effdf43ce5f199c6335a709efa5aa7c3acd686837f7afe4023bc64537d0",
+    "tests/test_service.py": "f13cbd2f6f6c4c99133c33c0a8f3a76ebf7cedf070d91172ff096b5b9a991eb8",
+    "tests/test_storage.py": "529608ec7a7445ccd325c8236db4a71171e07abb895ae2c40bebab0a379aec69",
+    "tests/test_vision_math.py": "1c4ee8eb2aa1bb258648d46e1b7c549d62c79a00250fff0e34bc75213db33546",
+    "tests/test_worker_boundaries.py": "164b648daa7d505880a61103b8028a34676c7bcdac13016734f294ef32a79f96",
+    "tools/__init__.py": "2eccadedd963ba8ffddcb5fcaf21095e9493e926f46fd8d8cbdb08cef544abc7",
+    "tools/check.py": "5c866ce5b210a6acd9dae9d69e82d3b1165d4625c84003f6cbc1d1072a685334",
+    "tools/device_simulator.py": "71086ebb9a82a53c652b6009f22a493f04d76d0dc3b618496bf02007ae8d192f",
+    "tools/download_models.py": "999dde21988959925ef3d51d5ad9d1d2181fb92829c5a1ce257fe55509950780",
+    "tools/evaluate.py": "59658f3347846c74db4ac9569c239f3a678c5deadd23294db8feb565772c1e43",
+    "tools/manage.py": "ca5458cfdb377c656e7ff789b8442e16ab2a76ca2ebc84d66be29050bc44a5e5",
+    "tools/record_visit.py": "fa0b6b46ca2cc9dbfaf1347136ec78f8eb0838e7ffb0866e3d9a9115b90023b1",
+    "tools/smoke_integration.py": "e04d600f42a5e169220f6f80a0d12d89274960aa76a0b0bbb1ce3f2aae45d570"
+  }
+}

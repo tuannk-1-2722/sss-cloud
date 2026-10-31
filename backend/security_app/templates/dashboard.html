@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Smart Security — Giám sát vùng cửa</title>
+  <meta name="theme-color" content="#121d2b">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/camera-stream.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header><div><span class="eyebrow">IOT · CAMERA DASHBOARD</span><h1>Smart Security</h1></div>
+    <span id="connection" class="badge">Chưa đăng nhập</span><button id="logout" hidden>Đăng xuất</button></header>
+  <main>
+    <section id="login-panel" class="card compact"><h2>Đăng nhập quản trị</h2>
+      <p>Dùng tài khoản nhóm đã tạo khi thiết lập hệ thống.</p>
+      <form id="login-form"><label>Tài khoản<input id="username" autocomplete="username" required value="admin"></label>
+        <label>Mật khẩu<input id="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">Đăng nhập</button></form>
+    </section>
+    <div id="app" hidden>
+      <div id="profile-banner" class="notice"></div>
+      <nav><button data-tab="monitor" class="selected">Giám sát</button><button data-tab="people">Người quen</button><button data-tab="history">Lịch sử</button></nav>
+      <section id="monitor" class="tab">
+        <div class="toolbar"><div><h2>Vùng cửa</h2><p id="mode-info">Đang tải…</p></div>
+          <div class="actions"><button id="arm" class="primary">Bật giám sát</button><button id="disarm">Tắt giám sát</button><button id="test">Test còi 1 giây</button></div></div>
+        <div class="live-toolbar"><span id="live-state" class="muted">Video tự kết nối khi mở trang, kể cả khi tắt giám sát.</span></div>
+        <div class="monitor-grid"><article class="card"><div class="image-wrap"><img id="camera-image" alt="Ảnh camera mới nhất" hidden><canvas id="overlay"></canvas><p id="image-empty">Chưa có ảnh camera</p></div><div class="metrics-bar"><span id="image-age" class="metric-pill">Tuổi ảnh: chưa có</span><span id="metric-fps" class="metric-pill">FPS: --</span><span id="metric-latency" class="metric-pill">Độ trễ API: --</span></div></article>
+          <article class="card"><h3>Trạng thái hệ thống</h3><dl id="health"></dl><h3>Đối tượng hiện tại</h3><div id="tracks"></div></article></div>
+        <p class="muted">Cảnh báo danh tính và xác nhận còi là hai trạng thái riêng. Người ngoài vùng cửa không tự làm còi kêu.</p>
+      </section>
+      <section id="people" class="tab" hidden>
+        <div class="toolbar"><div><h2>Người quen</h2><p>Đăng ký tạo mẫu so khớp, không huấn luyện lại mạng AI.</p></div><span id="people-count"></span></div>
+        <article id="enrollment-guide" class="card enrollment-guide" aria-labelledby="enrollment-guide-title">
+          <h3 id="enrollment-guide-title">Đăng ký khuôn mặt như thế nào?</h3>
+          <ol>
+            <li>Cố định camera, kiểm tra video có ảnh rõ; tắt giám sát trước khi đăng ký.</li>
+            <li>Tạo hồ sơ bên dưới, rồi bấm <strong>Đăng ký</strong> ở đúng hồ sơ. Camera sẽ tự mở cho phiên đăng ký.</li>
+            <li>Chỉ một khuôn mặt trong ảnh, mặt đủ sáng và nằm trong khung bầu dục. Làm theo hướng dẫn để thu hai lượt, mỗi lượt <span data-round-min>5</span> mẫu đạt.</li>
+            <li>Đủ hai lượt thì bấm <strong>Lưu mẫu</strong>. Mẫu được lưu nháp; hoàn tất hiệu chỉnh và kiểm tra trước khi kích hoạt người quen.</li>
+          </ol>
+        </article>
+        <article id="enrollment-setup" class="card"><form id="person-form" class="person-form"><label>Tên hiển thị<input id="display-name" maxlength="100" required></label><label class="checkbox"><input id="consent" type="checkbox" required> Người tham gia đã đồng ý đăng ký và lưu mẫu khuôn mặt trên máy chủ hệ thống.</label><button class="primary" type="submit">Tạo hồ sơ</button></form></article>
+        <article id="enrollment" class="card" hidden>
+          <div class="toolbar"><h3 id="enrollment-title">Đăng ký khuôn mặt</h3><span id="enrollment-time" class="badge"></span></div>
+          <div class="enrollment-layout">
+            <div>
+              <div class="image-wrap enrollment-camera">
+                <img id="enrollment-image" alt="Ảnh camera khi đăng ký; khung bầu dục là gợi ý căn mặt" hidden>
+                <canvas id="enrollment-overlay" aria-hidden="true"></canvas>
+                <p id="enrollment-image-empty">Đang chờ ảnh camera…</p>
+                <span id="enrollment-camera-pose" class="enrollment-camera-pose"></span>
+              </div>
+              <p id="enrollment-camera-state" class="muted" role="status"></p>
+            </div>
+            <div class="enrollment-coach">
+              <span class="eyebrow">HƯỚNG DẪN THU MẪU</span>
+              <h3 id="enrollment-pose" aria-live="polite"></h3>
+              <p id="enrollment-next-step"></p>
+              <label for="enrollment-meter" id="enrollment-progress"></label>
+              <progress id="enrollment-meter" max="10" value="0"></progress>
+              <p id="enrollment-rounds"></p>
+              <p id="enrollment-feedback" class="enrollment-feedback" role="status"></p>
+              <div class="actions"><button id="next-round">Bắt đầu lượt 2</button><button id="commit-enrollment" class="primary">Lưu mẫu</button><button id="cancel-enrollment">Hủy đăng ký</button></div>
+              <p class="muted">Mẫu được thu tự động khi đạt chất lượng. Hướng dẫn quay mặt là gợi ý theo tiến trình, chưa xác nhận góc quay hay chống giả mạo như Face ID. Hủy hoặc hết giờ sẽ bỏ mẫu chưa lưu.</p>
+            </div>
+          </div>
+        </article>
+        <div id="people-list"></div>
+      </section>
+      <section id="history" class="tab" hidden><div class="toolbar"><div><h2>Lịch sử sự kiện</h2><p id="history-retention">100 sự kiện gần nhất. Ảnh bằng chứng được giữ tối đa 7 ngày.</p></div><label>Mức cảnh báo<select id="severity-filter"><option value="all">Tất cả</option><option value="alarm">Cảnh báo còi</option><option value="warning">Cần kiểm tra</option><option value="info">Thông tin</option></select></label></div><div id="event-list"></div></section>
+    </div>
+    <dialog id="lightbox-dialog" class="lightbox-modal">
+      <div class="lightbox-content">
+        <div class="lightbox-header">
+          <h3 id="lightbox-title">Ảnh bằng chứng</h3>
+          <button id="lightbox-close" type="button" class="btn-close" aria-label="Đóng">&times;</button>
+        </div>
+        <div class="lightbox-body">
+          <img id="lightbox-img" alt="Ảnh bằng chứng phóng to">
+        </div>
+        <div class="lightbox-footer">
+          <p id="lightbox-meta" class="muted"></p>
+          <div class="actions">
+            <a id="lightbox-download" class="button primary" download="evidence.jpg">Tải ảnh về máy</a>
+            <button id="lightbox-dismiss" type="button">Đóng</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+    <p id="message" role="status" aria-live="polite"></p>
+  </main>
+  <footer>Một camera · nhận diện có kiểm soát chất lượng · giám sát vùng tiếp cận cửa</footer>
+</body></html>

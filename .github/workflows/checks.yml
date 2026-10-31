@@ -1,0 +1,32 @@
+name: checks
+on: [push, pull_request]
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip install -e .
+      - run: python -m ruff check backend tools tests
+      - run: python -m ruff format --check backend tools tests
+      - run: python -m pytest -q
+      - run: node --check backend/security_app/static/app.js
+      - run: g++ -std=c++17 -Wall -Wextra -Werror tests/firmware/alarm_logic_test.cpp -o /tmp/alarm-test
+      - run: /tmp/alarm-test
+      - run: g++ -std=c++17 -Wall -Wextra -Werror tests/firmware/frame_freshness_test.cpp -o /tmp/frame-age-test
+      - run: /tmp/frame-age-test
+  firmware:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.2.2'
+      - run: arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - run: arduino-cli lib update-index
+      - run: cp firmware/security_node/secrets.example.h firmware/security_node/secrets.h
+      - run: arduino-cli compile --profile ai_thinker firmware/security_node
