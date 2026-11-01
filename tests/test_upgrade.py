@@ -133,7 +133,7 @@ def test_cloud_analytics_auth_storage_and_stats(tmp_path, monkeypatch):
         }
         response = client.post(
             "/v1/infer",
-            headers={"Authorization": "******"},
+            headers={"Authorization": f"Bearer {token}"},
             json=monitoring,
         )
         assert response.status_code == 200
@@ -142,7 +142,7 @@ def test_cloud_analytics_auth_storage_and_stats(tmp_path, monkeypatch):
         ]
         response = client.post(
             "/v1/infer",
-            headers={"Authorization": "******"},
+            headers={"Authorization": f"Bearer {token}"},
             json=monitoring,
         )
         assert response.status_code == 422

@@ -396,22 +396,14 @@ Health cần 200. Status chưa login cần 401. Trình duyệt mở `https://YOU
 
 Nếu sau này dùng domain riêng trong Cloudflare: A record trỏ VM, bắt đầu DNS-only để giữ đường HTTPS giống hướng dẫn này. [DNS-only](https://developers.cloudflare.com/dns/proxy-status/) trả IP origin, không gọi Worker script. Nếu bật proxy Cloudflare sau đó thì cần kiểm lại chuỗi certificate ESP, client IP và cache; không phải bước bắt buộc hiện tại.
 
-## 9. ESP32: phần phải bổ sung trước khi nối cloud trực tiếp
+## 9. ESP32: build và xác nhận TLS hiện có
 
-**Firmware hiện chưa có triển khai TLS rõ ràng để nghiệm thu. Không chỉ đổi URL rồi coi là đã xong.** Bước 1–8 dựng được backend; bước 9 cần một issue firmware riêng trước khi dùng board với cloud.
+Source firmware hiện đã có HTTPS/TLS qua `NetworkClientSecure`, CA root, TLS WebSocket
+và từ chối public HTTP/insecure TLS. Không cần tạo lại implementation TLS để tiếp tục
+workflow này. Đây mới là trạng thái source; chưa thay cho compile với profile đang ghim,
+kiểm tra hostname/CA/đồng hồ trên mạng thật hoặc HIL.
 
-Yêu cầu của issue:
-
-- Dùng `NetworkClientSecure` với CA root đúng chuỗi certificate của hostname thực, kiểm hostname/certificate; không dùng `setInsecure()`.
-- Đồng bộ giờ có timeout hữu hạn trước TLS; lỗi giờ/certificate phải từ chối kết nối và giữ còi OFF.
-- Control và capture dùng client TLS riêng; giữ vòng đời client đến khi `HTTPClient` kết thúc, không dùng chung đối tượng giữa hai task.
-- Giữ command lease/session/revision/generation, ACK, hard cap và STOP độc lập upload. Không tự nới control timeout/freshness để che RTT chậm.
-- Đo RAM/stack/heap, handshake và reconnect trên AI-Thinker thật. Certificate root lấy từ CA chính thức sau khi xác định issuer thực; không copy leaf certificate tạm hoặc certificate ví dụ.
-- Bổ sung test fail-closed và chạy HIL cho TLS lỗi, DNS lỗi, upload chậm, mất Wi-Fi/cloud, STOP và command cũ.
-
-Espressif có [ví dụ TLS đúng core 3.3.0](https://github.com/espressif/arduino-esp32/blob/3.3.0/libraries/NetworkClientSecure/examples/WiFiClientSecure/WiFiClientSecure.ino); phải ghép theo hai task hiện tại của project.
-
-Chuẩn bị `secrets.h` **chỉ trên Windows**, sau khi issue TLS có implementation:
+Chuẩn bị `secrets.h` **chỉ trên Windows**:
 
 ```cpp
 #pragma once
@@ -423,7 +415,9 @@ Chuẩn bị `secrets.h` **chỉ trên Windows**, sau khi issue TLS có implemen
 #define ALARM_ACTIVE_HIGH true
 ```
 
-Active level phải theo module thực. CA/TLS settings theo implementation mới, không đoán tên macro chưa tồn tại.
+Active level phải theo module thực. `ServerTrust.h` cung cấp ISRG Root X1 mặc định;
+chỉ override `SSS_SERVER_ROOT_CA` nếu certificate chain của hostname thực cần CA khác.
+Không dùng `setInsecure()` hoặc public HTTP.
 
 Lấy token từ VM qua SSH/SCP vào file private ngoài repo, không cần in token vào chat. Ví dụ **Windows**:
 
@@ -434,7 +428,7 @@ scp -i "$sshKey" ubuntu@VM_PUBLIC_IP:/home/ubuntu/sss-private/runtime-hardware/d
 
 Mở file bằng editor riêng, điền vào secrets local. Token này phải khớp credential cloud; token runtime laptop cũ sẽ không khớp. Không chuyển `credentials.json` cloud vào firmware.
 
-**Windows**, sau khi TLS implementation sẵn sàng:
+**Windows**, build bằng đúng profile đã ghim trước khi nạp:
 
 ```powershell
 Set-Location D:\smart-security-upgraded
@@ -445,7 +439,11 @@ arduino-cli upload --profile ai_thinker --port COM_PORT firmware/security_node
 arduino-cli monitor --port COM_PORT --config baudrate=115200
 ```
 
-Profile pin ESP32 core 3.3.0/ArduinoJson 7.4.1; hướng dẫn repo dùng Arduino CLI 1.2.2. Compile pass không thay HIL. Dùng nguồn/đấu dây đã kiểm, còi OFF khi boot.
+Profile pin ESP32 core 3.3.12, WebSockets 2.7.2 và ArduinoJson 7.4.1; hướng dẫn repo
+dùng Arduino CLI 1.2.2. Compile pass không thay HIL. Trước khi dùng với người thật,
+kiểm tra hostname/CA/đồng hồ, lỗi TLS/DNS/mất mạng phải fail-closed và còi vẫn OFF;
+đo reconnect, heap/stack, STOP và command cũ trên board thực. Dùng nguồn/đấu dây đã
+kiểm, còi OFF khi boot.
 
 Đích kiểm: board hello thành công, sync có session, dashboard camera online; khi DISARMED chưa gửi ảnh giám sát là đúng. Bấm Preview để kiểm ảnh, không cố arm lúc calibration chưa đạt.
 
@@ -526,7 +524,7 @@ sudo systemctl start smart-security
 | FileLock khi start/bootstrap/evaluate | Còn process app khác; chỉ một process trên runtime |
 | Login HTTP không giữ session | `SSS_HTTPS=1`: đăng nhập bằng URL HTTPS thật |
 | Board 401 | Token trong firmware không khớp token cloud |
-| Board không TLS được | Firmware TLS chưa hoàn thiện, giờ/CA/hostname sai, heap hoặc timeout |
+| Board không TLS được | Kiểm tra URL HTTPS, giờ hệ thống/NTP, CA chain/hostname, DNS, heap và timeout |
 | Camera online nhưng chưa có ảnh | DISARMED: bấm Preview; kiểm lease/capture/Serial |
 | CALIBRATION_REQUIRED | Cần validation/reviewer/profile thật, chưa được arm |
 | R2 trống | Chưa có adapter/outbox; bucket mới không tự nhận ảnh |
@@ -536,7 +534,7 @@ sudo systemctl start smart-security
 
 - Làm ngay: SSH key, đăng ký DuckDNS, giữ gói source sạch, kiểm phần cứng LAN và lưu thông tin tài khoản riêng.
 - Oracle kích hoạt: tạo VM đúng quota, SSH, gửi source, cài packages/model, bootstrap runtime mới, systemd và HTTPS.
-- Khi backend HTTPS chạy: hoàn thiện issue TLS firmware rồi nối board; sau đó calibration/HIL.
+- Khi backend HTTPS chạy: compile firmware theo profile ghim, nối board sau khi build đạt; kiểm tra TLS/control/video trên board rồi mới calibration/HIL.
 - Sau core: R2 ảnh; Workers/D1 chỉ khi cần.
 
-Hướng dẫn không tự tạo VM, mở cổng, truyền biometric, thay firmware hay tạo R2 credential. Phần còn phải triển khai trong code là TLS firmware và adapter R2; không diễn giải các bước cấu hình như bằng chứng hai phần đó đã hoạt động.
+Hướng dẫn không tự tạo VM, mở cổng, truyền biometric, thay firmware hay tạo R2 credential. Firmware TLS đã có trong source nhưng compile/HIL thực vẫn cần xác nhận; adapter R2 chưa có. Không diễn giải các bước cấu hình như bằng chứng hardware hoặc cloud đã nghiệm thu.
