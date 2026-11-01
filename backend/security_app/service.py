@@ -79,6 +79,9 @@ class SecurityService:
         self.sync_cache = None
         self.pending: Packet | None = None
         self.processing = False
+        from .diagnostics import RecognitionDiagnostics
+
+        self.diagnostics = RecognitionDiagnostics(**config["diagnostics"])
         self.latest_analysis: dict | None = None
         self.environment_quality: dict | None = None
         self.generation = 0
@@ -585,6 +588,17 @@ class SecurityService:
                 # Choosing the earliest estimate includes measurable WAN/queue delay.
                 observed = min(observed, meta.captured_uptime_ms + min(self.device_clock_offsets))
             capture_age = max(0, received - observed)
+            self.diagnostics.record(
+                "capture_rejected" if self.now() - observed > 1000 else "ingress",
+                self.now(),
+                frame_seq=meta.seq,
+                observed_ms=observed,
+                received_ms=received,
+                capture_age_ms=capture_age,
+                reported_capture_age_ms=meta.capture_age_ms,
+                validation_ms=max(0, self.now() - received),
+                mode_revision=meta.mode_revision,
+            )
             if self.now() - observed > 1000:
                 raise DomainError("CAPTURE_TOO_OLD", 422)
             self._upload_token(self.now())
@@ -634,6 +648,14 @@ class SecurityService:
             }
 
     def receipt(self, packet: Packet, state: str, reason: str | None = None):
+        self.diagnostics.record(
+            state,
+            self.now(),
+            frame_seq=packet.meta.seq,
+            reason=reason,
+            mode_revision=packet.meta.mode_revision,
+            gallery_revision=packet.gallery_revision,
+        )
         if packet.durable_receipt:
             self._receipt_state(packet.frame_id, state, reason)
 
@@ -670,6 +692,7 @@ class SecurityService:
                 },
                 "video": {**self.video.metrics(), **self.video.demand(), **self.cfg["video"]},
                 "analysis": self.analysis_metrics(now),
+                "diagnostics": self.diagnostics.snapshot(now, include_records=False),
                 "device_telemetry": self.device_telemetry,
                 "profile": self.cfg["profile"],
                 "source": self.source,
@@ -696,6 +719,7 @@ class SecurityService:
                 "pending_frame": bool(self.pending),
                 "frames_replaced": self.dropped,
                 "tracks": self.policy.snapshot(),
+                "recent_visits": self.policy.recent_visits,
                 "capture": self.capture_status(),
                 "latest_analysis": self.latest_analysis,
                 "environment_quality": self.environment_quality,
@@ -753,6 +777,24 @@ class SecurityService:
         decisions = self.policy.ingest(packet.frame_id, observed, observations)
         if any(o.geometry_valid for o in observations):
             self.last_presence_ms = now
+        self._commit_decisions(packet, decisions, previous_alarm)
+        self.latest_analysis = {
+            "frame_id": packet.frame_id,
+            "source": self.source,
+            "observations": [o.model_dump() for o in observations],
+            "processed_at": utcnow(),
+        }
+        self.last_analysis_ms = now
+        self.worker_error = None
+
+    def _finish_visits(self):
+        if self.mode != "ARMED":
+            return
+        decisions = self.policy.advance(self.now())
+        self._commit_decisions(None, decisions, self.policy.last_alarm)
+
+    def _commit_decisions(self, packet, decisions, previous_alarm):
+        now = clock_ms()
         for decision in decisions:
             if (
                 decision["audible"]
@@ -763,7 +805,7 @@ class SecurityService:
                 decision["audible"], decision["suppression"] = False, "stop_pending"
                 self.policy.last_alarm = previous_alarm
             event_id, media_id = str(uuid4()), None
-            if packet.jpeg:
+            if packet and packet.jpeg and decision["reason"] != "visit_completed":
                 media_id = str(uuid4())
                 try:
                     temp = self.runtime / "media" / f"{media_id}.tmp"
@@ -774,9 +816,9 @@ class SecurityService:
                     decision["evidence_error"] = "MEDIA_WRITE_FAILED"
             decision.update(
                 {
-                    "frame_id": packet.frame_id,
+                    "frame_id": packet.frame_id if packet else None,
                     "gallery_revision": self.gallery_revision,
-                    "model_set_id": "opencv-zoo-cpu-v1",
+                    "model_set_id": self.store.manifest["model_set_id"],
                     "calibration_id": self.calibration.get("calibration_id"),
                     "mode_revision": self.mode_revision,
                 }
@@ -817,14 +859,6 @@ class SecurityService:
                         )
             if staged_command:
                 self._deliver_committed(staged_command)
-        self.latest_analysis = {
-            "frame_id": packet.frame_id,
-            "source": self.source,
-            "observations": [o.model_dump() for o in observations],
-            "processed_at": utcnow(),
-        }
-        self.last_analysis_ms = now
-        self.worker_error = None
 
     def analysis_metrics(self, now):
         times = self.analysis_times

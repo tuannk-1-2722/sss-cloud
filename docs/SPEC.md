@@ -59,11 +59,13 @@ trước publish; enrollment còn phải có viewer hướng dẫn và còn cầ
 
 **FR-06 — Geometry:** A=`zones.approach`, B=`zones.doorstep`; normalized rectangles `[x,y,w,h]`, không chồng, nằm trọn ảnh. Anchor là tâm bbox **thân người**. Đây không phải ước lượng mét/homography/sàn. Face-only có bbox để hiển thị/so mặt nhưng `geometry_valid=false`, không tạo bằng chứng incoming.
 
-Một raw zone phải đủ `stable_observations` liên tiếp trước thay stable zone. Đếm theo frame khác nhau. Nhận diện mặt chỉ chạy khi raw anchor ở B; quyết định policy chỉ chạy khi raw và stable đều B.
+Một raw zone phải đủ `stable_observations` liên tiếp trước thay stable zone. Đếm theo frame khác nhau. Nhận diện lấy bằng chứng trong `vision.recognition_region`, độc lập A/B, gồm cả đường tiếp cận và khe trung tính. `identity_eligible` cho biết observation nằm trong ROI này. Event tại cửa/còi vẫn cần raw và stable đều B; face-only không tạo incoming.
 
 **FR-07 — Direction:** trong một track liên tục, đã stable A với geometry hợp lệ rồi stable B khi bằng chứng A còn trong `approach_history_ms` → INCOMING. Khoảng trung tính giữa hai vùng được phép nếu track liên tục. B → A → OUTGOING. B xuất hiện trước khi có A → UNRESOLVED. Mất track quá `track_gap_ms`, association mơ hồ hoặc đổi body/face-only → track mới, không kế thừa chiều/known.
 
-**FR-08 — Visit:** stable entry B tạo `visit_id` UUID mới, reset votes, confirmations, emitted reasons và silence. Rời B ổn định rồi vào lại tạo lượt mới. Border bounce chưa stable không tạo lượt mới. Không có incident camera-wide để suppress mọi người mới khi còn người quen trong ảnh.
+**FR-08 — Visit:** stable entry B tạo `visit_id` UUID mới, reset emitted reasons, kết quả lượt và silence; giữ identity evidence còn mới đã thu trong ROI của cùng track trước khi đến cửa. Dwell tính từ raw B đầu tiên của chuỗi liên tục đã được xác nhận ổn định; mất observation trước stable entry bắt đầu lại chuỗi. Rời B ổn định thì đóng lượt và xóa evidence của lượt cũ; vào lại tạo lượt mới. Border bounce chưa stable không tạo lượt mới. Không có incident camera-wide để suppress mọi người mới khi còn người quen trong ảnh.
+
+Khi rời B ổn định, đổi geometry hoặc mất track quá `track_gap_ms`, ghi `visit_completed` đúng một lần, kể cả lượt không đủ `unresolved_warning_ms`. Kết quả là KNOWN/UNKNOWN/UNCERTAIN, kèm completion/quality reason. Kết quả đã phát trước đó được giữ như lịch sử; conflicting known IDs làm kết quả cuối uncertain. Hoàn tất lượt khi worker nhàn rỗi không tạo phiếu hay alarm mới. Inference hợp lệ của ảnh chụp trước khi người rời đi có thể COMMIT sau lúc họ rời ảnh, trong freshness/revision gates hiện có. STOP/disarm/session/gallery change vẫn vô hiệu kết quả cũ.
 
 Mỗi lượt có thể có info/warning/alarm riêng; warning có thể nâng thành alarm trong cùng lượt. Mỗi `(visit_id,reason)` được ghi tối đa một lần, unique DB constraint bảo vệ retry. Track ID chỉ tạm trong runtime; không là định danh người lạ xuyên buổi/camera.
 
@@ -90,6 +92,8 @@ vote_spacing_ms cũ chỉ giữ để đọc config tương thích, không đi�
 Conflicting known IDs reset; unknown cần không có known ID trong cửa sổ.
 Uncertain/no-face không thành unknown. Identity hết freshness thì uncertain.
 Geometry/tracking/policy dùng cùng observed time, TTL lệnh dùng clock hiện tại.
+
+Bằng chứng ROI trước B vẫn phải đủ số phiếu/span/freshness, không hạ ngưỡng matching vì hành động ngắn. Kết quả KNOWN của lượt đã ghi không bị xóa khỏi lịch sử khi ảnh sau mất mặt; identity hiện tại có thể hết freshness. `policy.flow_version` và ROI thuộc hash calibration, thay đổi đòi review profile. Model vẫn NanoDet/YuNet/SFace 128d trong bản nâng cấp này; ứng viên InsightFace tạm hoãn theo quyết định người dùng.
 
 Gallery rỗng hoặc model/calibration lỗi chặn arm; không gọi mọi người là unknown. Threshold trong default là seed. Hardware arm cần validated profile đúng camera/config/model manifest và có report/reviewer.
 

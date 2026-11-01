@@ -91,6 +91,19 @@ class VideoView(StrictModel):
     enrollment_session_id: str | None = Field(default=None, max_length=64)
 
 
+class FaceEvidence(StrictModel):
+    """Optional measured scalars; never an embedding or probability of identity."""
+
+    min_side_px: float | None = Field(default=None, ge=0)
+    eye_distance_px: float | None = Field(default=None, ge=0)
+    blur: float | None = Field(default=None, ge=0)
+    eye_blur: float | None = Field(default=None, ge=0)
+    clipped: float | None = Field(default=None, ge=0, le=1)
+    face_confidence: float | None = Field(default=None, ge=0, le=1)
+    s1: float | None = Field(default=None, ge=-1.001, le=1.001)
+    s2: float | None = Field(default=None, ge=-1.001, le=1.001)
+
+
 class Observation(StrictModel):
     track_id: str = Field(min_length=1, max_length=64)
     bbox: tuple[float, float, float, float]
@@ -98,6 +111,9 @@ class Observation(StrictModel):
     person_id: str | None = None
     geometry_valid: StrictBool = True
     reason: str | None = None
+    evidence: FaceEvidence | None = None
+    identity_eligible: StrictBool = False
+    tracking_reason: str | None = Field(default=None, max_length=64)
 
     @field_validator("bbox")
     @classmethod

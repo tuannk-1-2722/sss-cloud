@@ -1,12 +1,24 @@
-# Smart Security System — bản nâng cấp staging cho IoT Level 3 (20/10/2026)
+# Smart Security System — giám sát vùng cửa
 
-> **Bản staging:** đã thêm PWA/MJPEG, cải thiện quality/night adaptation, Telegram URL và cloud inference + cloud analytics tùy chọn. **Không tuyên bố đạt Level 3** cho đến khi có triển khai cloud/ảnh log/HIL thật. Bắt đầu từ [Phân tích IoT Level 3 và hướng dẫn triển khai](docs/LEVEL3_UPGRADE.md) và [Audit code/risks](docs/UPGRADE_AUDIT.md). Không tự bật cloud hoặc Telegram khi chưa cấu hình và có quyền xử lý dữ liệu.
+**Hiện trạng 01/11/2026:** ESP32-CAM kết nối Oracle; backend, NanoDet/YuNet/SFace,
+gallery và lịch sử chạy trên VM. Laptop/điện thoại mở dashboard. Luồng lượt đến
+cửa ngắn đã triển khai lên Oracle lúc 22:27 (giờ Việt Nam), giữ model/ngưỡng cũ.
+Gallery đang rỗng; calibration cũ cần duyệt lại nên chưa bật giám sát. Xem
+[chuẩn bị demo](docs/DEMO_RUNBOOK.md) và [kết quả kiểm chứng](docs/RECOGNITION_UPGRADE.md).
+Software pass không thay nghiệm thu accuracy, độ trễ hoặc còi thật.
 
 **Ngày review:** 02/10/2026 · **Nhóm:** 3 người · **Deadline:** khoảng **tháng 11/2026**, chờ ngày nộp chính thức.
 
-Giám sát **người tiến từ vùng ngoài vào vùng gần cửa** bằng ESP32-CAM + PIR. Chế độ mặc định nhận diện trên laptop CPU; chế độ cloud opt-in có thể chuyển nhận diện sang host từ xa (cần HTTPS, model weights và quyền xử lý ảnh). Cảnh báo tại chỗ vẫn do gateway quyết định. Người đi ngang hoặc đứng xa không tự tạo cảnh báo danh tính.
+Giám sát **người tiến từ vùng ngoài vào vùng gần cửa** bằng ESP32-CAM + PIR.
+Cấu hình mặc định repository là simulation; cấu hình triển khai hardware nằm
+ngoài Git. Trên Oracle, `inference=local` nghĩa là chạy AI ngay trong VM; adapter
+cloud từ xa vẫn là tùy chọn riêng. Server quyết định lệnh, ESP32 giữ ACK/STOP và
+hard timeout của còi. Người đi ngang hoặc đứng xa không tự tạo cảnh báo danh tính.
 
-Gói này gồm **tài liệu đã viết lại + mã nền chạy được + simulator + kiểm thử**. Chưa có board của nhóm, dataset người thật hoặc calibration thực tế. Không coi đây là sản phẩm đã nghiệm thu phần cứng/độ chính xác. Xem [bằng chứng bàn giao](docs/VALIDATION.md#6-bằng-chứng-của-gói-bàn-giao).
+Đã có camera lắp thực tế và pilot riêng được đồng ý; các dữ liệu đó không nằm
+trong Git. Holdout độc lập và HIL của luồng mới còn thiếu. Các tài liệu staging
+ngày 20/10 lưu lại thiết kế ban đầu; không dùng phần mô tả laptop inference trong
+đó để giải thích topology Oracle hiện tại.
 
 **Bắt đầu review bản này:** đọc [UPGRADE_AUDIT](docs/UPGRADE_AUDIT.md) để biết thay đổi/rủi ro,
 rồi [ARCHITECTURE](docs/ARCHITECTURE.md) để nắm bộ khung và cách chia việc.
@@ -22,6 +34,7 @@ Giữ baseline runnable; không xóa toàn bộ. Hardware/AI thực vẫn là vi
 | Hiểu ranh giới code và cách thay một module | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Chia việc, dùng Git/agent, lịch đến tháng 11 | [PLAN.md](docs/PLAN.md) |
 | Thu dữ liệu, hiệu chỉnh, kiểm thử, demo | [VALIDATION.md](docs/VALIDATION.md) |
+| Chuẩn bị demo tại trường, vận hành và xử lý lỗi | [DEMO_RUNBOOK.md](docs/DEMO_RUNBOOK.md) |
 | Kiểm tra lý do và nguồn kỹ thuật | [RESEARCH.md](docs/RESEARCH.md) |
 
 **Agent đọc `AGENTS.md` trước, rồi chỉ đọc mục liên quan.** Không cần nạp cả bộ tài liệu ở mỗi task. `TEAM_GUIDE` giải thích cho người; `SPEC` sở hữu hành vi; `CONTRACTS` sở hữu protocol; `configs/default.yaml` sở hữu số mặc định. Khi đổi yêu cầu, sửa phần sở hữu và phần giải thích bị ảnh hưởng trong cùng PR.

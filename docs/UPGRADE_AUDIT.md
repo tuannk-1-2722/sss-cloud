@@ -1,5 +1,10 @@
 # Audit bản nâng cấp theo mã và risk
 
+**Bản audit staging 20/10; cập nhật 01/11:** đã có Oracle chạy backend/AI/DB và
+ESP32 gửi dữ liệu thật. Blocker thiếu host bên dưới là ghi nhận lịch sử. Trạng
+thái mới xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md); accuracy/holdout/HIL của
+flow mới vẫn chưa nghiệm thu, không được hiểu deployment là đã đạt các gate này.
+
 **Tính chất:** review ở mức source/module/contracts/tests; không tuyên bố đã hiểu "từng dòng" của `.git`, binary pretrained models hoặc dữ liệu private trong ZIP.
 
 ## Đã đọc/đối chiếu

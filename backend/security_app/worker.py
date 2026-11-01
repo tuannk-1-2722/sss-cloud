@@ -58,7 +58,12 @@ class VisionWorker:
                     ]
                     remaining = max(0, next_start - s.now())
                     if not s.stopping and (not s.pending or remaining):
-                        s.condition.wait(timeout=min(1, remaining / 1000) if remaining else 1)
+                        housekeeping = s.cfg["analysis"]["housekeeping_ms"] / 1000
+                        s.condition.wait(
+                            timeout=min(housekeeping, remaining / 1000)
+                            if remaining
+                            else housekeeping
+                        )
                     if s.stopping:
                         if vision and hasattr(vision, "close"):
                             vision.close()
@@ -84,6 +89,7 @@ class VisionWorker:
                         s._cancel_pending()
                     packet, s.pending = s.pending, None
                     if packet is None:
+                        s._finish_visits()
                         continue
                     if packet.meta.mode_revision != s.mode_revision:
                         s.receipt(packet, "cancelled", "REVISION_CHANGED")
@@ -161,6 +167,41 @@ class VisionWorker:
                             s._enrollment_result(packet, vector, quality)
                             s.last_analysis_ms = s.now()
                         s.receipt(packet, "processed")
+                    snapshots = {t["track_id"]: t for t in s.policy.snapshot()}
+                    s.diagnostics.record(
+                        "analysis",
+                        s.now(),
+                        frame_seq=packet.meta.seq,
+                        observed_ms=observed,
+                        received_ms=packet.received_ms,
+                        duration_ms=max(0, s.now() - started),
+                        queue_wait_ms=s.last_ai_queue_ms,
+                        result_age_ms=max(0, s.now() - observed),
+                        stages=s.last_stage_ms,
+                        face_count=(getattr(vision, "last_counts", {}) or {}).get("face_count"),
+                        person_count=(getattr(vision, "last_counts", {}) or {}).get("person_count"),
+                        mode_revision=packet.meta.mode_revision,
+                        gallery_revision=packet.gallery_revision,
+                        observations=[
+                            {
+                                **o.model_dump(),
+                                **{
+                                    k: v
+                                    for k, v in snapshots.get(o.track_id, {}).items()
+                                    if k
+                                    in {
+                                        "zone",
+                                        "stable_zone",
+                                        "votes",
+                                        "known_votes",
+                                        "unknown_votes",
+                                        "evidence_span_ms",
+                                    }
+                                },
+                            }
+                            for o in observations
+                        ],
+                    )
             except Exception as exc:
                 logger.exception("Worker failed: %s", packet.frame_id if packet else "housekeeping")
                 with s.lock:

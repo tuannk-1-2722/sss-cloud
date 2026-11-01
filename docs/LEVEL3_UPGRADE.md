@@ -1,5 +1,10 @@
 # Đánh giá cấp độ IoT và thiết kế nâng cấp — bản staging 20/10/2026
 
+**Cập nhật topology 01/11:** bản triển khai hiện tại dùng ESP32 → Oracle, backend,
+AI và DB cùng trên VM; laptop chỉ mở web. Các kiến trúc laptop/gateway phía dưới
+là thiết kế staging ban đầu. Xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md) và
+[DEMO_RUNBOOK](DEMO_RUNBOOK.md) cho hiện trạng và các gate chưa nghiệm thu.
+
 **Địa vị:** đề xuất kỹ thuật + code staging, **không phải báo cáo nghiệm thu Level 3**, không phải kết quả HIL. Các ngưỡng môi trường và chất lượng AI còn phải hiệu chỉnh với ESP32-CAM/OV2640 thật. Nguyên tắc: giữ core v2.1 đang chạy, chỉ bật cloud khi đáp ứng điều kiện triển khai và đồng ý xử lý dữ liệu sinh trắc.
 
 ## 1. Nguồn phân cấp chính: PDF môn học

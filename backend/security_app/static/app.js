@@ -17,6 +17,7 @@ let lastRtt = null;
 let activeTab = "monitor", cameraStatusValid = false, cameraTarget = null;
 let displayedFrame = null, displayedMeta = null;
 let nextListsRefresh = 0, cachedPeople = [], lastStatusRefresh = -Infinity;
+let lastCompletedVisit = null;
 
 const labels = {
   KNOWN: "Người quen",
@@ -31,6 +32,7 @@ const labels = {
   OUTGOING: "Từ cửa ra ngoài",
   UNRESOLVED: "Chưa rõ chiều đi",
   known_visit: "Người quen ở vùng cửa",
+  visit_completed: "Kết quả lượt vừa kết thúc",
   unknown_approach: "Người chưa đăng ký tiếp cận cửa",
   unresolved_presence: "Cần kiểm tra người ở vùng cửa",
   capacity_exceeded: "Vượt phạm vi hai người",
@@ -45,6 +47,18 @@ const labels = {
   failed: "Gửi thất bại",
   unknown: "Chưa xác nhận gửi thành công"
 };
+
+const setupMessages = {
+  CAMERA_PROFILE_CHANGED: "Luồng xử lý hoặc bố trí camera đã thay đổi. Cần kiểm chứng và duyệt lại hồ sơ hiệu chỉnh trước khi bật giám sát. Video và đăng ký mẫu vẫn dùng được.",
+  CALIBRATION_REQUIRED: "Chưa có hồ sơ hiệu chỉnh được duyệt. Hãy hoàn tất đăng ký mẫu và kiểm chứng camera trước khi bật giám sát.",
+  EMPTY_GALLERY: "Chưa có người quen đang được dùng để nhận diện. Vào Người quen để đăng ký, lưu mẫu và kích hoạt hồ sơ sau khi kiểm chứng.",
+  GALLERY_SAMPLES_REQUIRED: "Hồ sơ chưa đủ mẫu hợp lệ. Hãy hoàn tất hai lượt đăng ký và lưu mẫu.",
+  GALLERY_REENROLL_REQUIRED: "Mẫu đã lưu không tương thích với model hiện tại. Cần đăng ký lại trước khi giám sát."
+};
+
+function setupMessage(code) {
+  return setupMessages[code] || code;
+}
 
 const enrollmentFeedback = {
   "Face the camera; follow the enrollment guide": "Đưa mặt vào khung bầu dục, nhìn vào camera để bắt đầu thu mẫu.",
@@ -178,7 +192,7 @@ async function api(path, method = "GET", body) {
     throw new Error("Cần đăng nhập lại.");
   }
   const result = response.status === 204 ? {} : await response.json();
-  if (!response.ok) throw new Error(result.error?.code || "Yêu cầu thất bại");
+  if (!response.ok) throw new Error(setupMessage(result.error?.code) || "Yêu cầu thất bại");
   return result;
 }
 
@@ -294,6 +308,9 @@ function logoutView() {
   invalidateCamera();
   current = null;
   events = [];
+  cachedPeople = [];
+  nextListsRefresh = 0;
+  lastCompletedVisit = null;
   peopleById.clear();
   clearImages();
   for (const id of ["event-list", "people-list", "tracks"]) $(id).replaceChildren();
@@ -361,6 +378,11 @@ for (const [id, mode] of [
   show(labels[mode]);
 });
 
+$("recognition-trace").onclick = e => action(e.target, async () => {
+  await api("/diagnostics/recognition/start", "POST", {});
+  show("Đang ghi số đo trong 2 phút. Bạn có thể thực hiện các lượt thử.");
+});
+
 $("test").onclick = e => action(e.target, async () => {
   await api("/system/test-alarm", "POST", {
     idempotency_key: actionKey()
@@ -421,7 +443,7 @@ async function refresh() {
     $("login-panel").hidden = true;
     $("logout").hidden = false;
     $("connection").textContent = current.device_online ? "Thiết bị online" : "Thiết bị offline";
-    $("profile-banner").textContent = current.profile === "simulation" ? "ĐANG GIẢ LẬP — quan sát và còi không phải kết quả phần cứng hoặc độ chính xác AI." : "CAMERA THẬT — " + (current.calibration_error ? "Cần hoàn tất hiệu chỉnh: " + current.calibration_error : "Hồ sơ hiệu chỉnh: " + current.calibration_id);
+    $("profile-banner").textContent = current.profile === "simulation" ? "ĐANG GIẢ LẬP — quan sát và còi không phải kết quả phần cứng hoặc độ chính xác AI." : "CAMERA THẬT — " + (current.calibration_error ? setupMessage(current.calibration_error) : current.active_people === 0 ? setupMessage("EMPTY_GALLERY") : "Hồ sơ hiệu chỉnh: " + current.calibration_id);
     $("mode-info").textContent = labels[current.mode] + (current.worker_error ? " · " + current.worker_error : "");
     const health = $("health");
     health.replaceChildren();
@@ -438,6 +460,12 @@ async function refresh() {
     statusRow(health, "FPS nhận từ camera", current.video.received_fps.toFixed(1));
     statusRow(health, "Nhịp AI", current.mode === "DISARMED" ? "Đã dừng" : `${current.analysis.interval_ms} ms · thực tế ${current.analysis.effective_fps.toFixed(1)} FPS`);
     statusRow(health, "Thời gian AI p95", current.analysis.duration_p95_ms === null ? "Chưa đo" : `${current.analysis.duration_p95_ms} ms${current.analysis.over_budget ? " · vượt ngân sách xử lý" : ""}`);
+    const completed = current.recent_visits || [];
+    const latestCompleted = completed.length ? completed[completed.length - 1].visit_id : null;
+    if (latestCompleted !== lastCompletedVisit) {
+      lastCompletedVisit = latestCompleted;
+      nextListsRefresh = 0;
+    }
     if (performance.now() >= nextListsRefresh) {
       const [people, receivedEvents] = await Promise.all([api("/people"), api("/events?limit=100")]);
       if (epoch !== viewEpoch) return;
@@ -462,6 +490,11 @@ async function refresh() {
         }));
         row.append(b);
       }
+      tracks.append(row);
+    }
+    for (const visit of completed.slice(-3).reverse()) {
+      const row = node("div", undefined, "track");
+      row.append(node("strong", `Lượt đã kết thúc: ${labels[visit.identity] || labels.UNCERTAIN}${visit.person_id ? ` · ${peopleById.get(visit.person_id) || "Hồ sơ"}` : ""}`));
       tracks.append(row);
     }
     renderEnrollment();
@@ -512,6 +545,7 @@ function renderEvents() {
     row.append(node("h3", labels[event.reason] || event.reason), node("p", new Date(event.created_at).toLocaleString("vi-VN") + " · " + event.source));
     row.append(node("p", `Còi: ${event.details.audible?(labels[event.command?.state]||"Chờ thiết bị"):(event.details.suppression||"Không phát lệnh")}. Thông báo: ${labels[event.notification?.state]||"Trong dashboard"}.`));
     if (event.details.person_id) row.append(node("p", `Người: ${peopleById.get(event.details.person_id) || "Hồ sơ không còn active"}`));
+    if (event.reason === "visit_completed") row.append(node("p", `Kết quả: ${labels[event.details.identity] || labels.UNCERTAIN}`));
     const actions = node("div", undefined, "actions");
     const ack = node("button", event.acknowledged_at ? "Đã xem" : "Đánh dấu đã xem");
     ack.disabled = !!event.acknowledged_at;

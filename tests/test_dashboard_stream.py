@@ -36,6 +36,16 @@ def test_stream_script_is_loaded_and_cached_with_dashboard(cfg):
         assert client.get("/api/v2/live.mjpg").status_code == 401
 
 
+def test_diagnostic_button_uses_versioned_script_even_with_old_static_cache(cfg):
+    import re
+
+    with TestClient(main_module.create_app(cfg)) as client:
+        html = client.get("/").text
+        script = re.search(r'src="(/static/app\.js\?v=[^"]+)"', html)
+        assert script and 'id="recognition-trace"' in html
+        assert "/diagnostics/recognition/start" in client.get(script[1]).text
+
+
 @pytest.mark.parametrize("accept", ["*/*", "application/octet-stream"])
 def test_mjpeg_metadata_freshness_and_viewer_slots(cfg, accept):
     from test_api import login

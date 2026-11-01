@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="/static/icon-192.png">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/camera-stream.js" defer></script>
-  <script src="/static/app.js" defer></script>
+  <script src="/static/app.js?v=doorstep-demo-1" defer></script>
 </head>
 <body>
   <header><div><span class="eyebrow">IOT · CAMERA DASHBOARD</span><h1>Smart Security</h1></div>
@@ -27,7 +27,7 @@
       <section id="monitor" class="tab">
         <div class="toolbar"><div><h2>Vùng cửa</h2><p id="mode-info">Đang tải…</p></div>
           <div class="actions"><button id="arm" class="primary">Bật giám sát</button><button id="disarm">Tắt giám sát</button><button id="test">Test còi 1 giây</button></div></div>
-        <div class="live-toolbar"><span id="live-state" class="muted">Video tự kết nối khi mở trang, kể cả khi tắt giám sát.</span></div>
+        <div class="live-toolbar"><span id="live-state" class="muted">Video tự kết nối khi mở trang, kể cả khi tắt giám sát.</span><button id="recognition-trace">Ghi chẩn đoán 2 phút</button></div>
         <div class="monitor-grid"><article class="card"><div class="image-wrap"><img id="camera-image" alt="Ảnh camera mới nhất" hidden><canvas id="overlay"></canvas><p id="image-empty">Chưa có ảnh camera</p></div><div class="metrics-bar"><span id="image-age" class="metric-pill">Tuổi ảnh: chưa có</span><span id="metric-fps" class="metric-pill">FPS: --</span><span id="metric-latency" class="metric-pill">Độ trễ API: --</span></div></article>
           <article class="card"><h3>Trạng thái hệ thống</h3><dl id="health"></dl><h3>Đối tượng hiện tại</h3><div id="tracks"></div></article></div>
         <p class="muted">Cảnh báo danh tính và xác nhận còi là hai trạng thái riêng. Người ngoài vùng cửa không tự làm còi kêu.</p>

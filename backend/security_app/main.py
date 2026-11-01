@@ -222,6 +222,22 @@ def create_app(config: dict | None = None) -> FastAPI:
     def status(s: SecurityService = Depends(service)):
         return s.status()
 
+    @app.get("/api/v2/diagnostics/recognition", dependencies=[Depends(admin)])
+    def recognition_diagnostics(after: int = 0, s: SecurityService = Depends(service)):
+        with s.lock:
+            return s.diagnostics.snapshot(s.now(), after=max(0, after))
+
+    @app.post("/api/v2/diagnostics/recognition/start", dependencies=[Depends(admin)])
+    def start_recognition_diagnostics(s: SecurityService = Depends(service)):
+        with s.lock:
+            return s.diagnostics.start(s.now())
+
+    @app.delete("/api/v2/diagnostics/recognition", status_code=204, dependencies=[Depends(admin)])
+    def stop_recognition_diagnostics(s: SecurityService = Depends(service)):
+        with s.lock:
+            s.diagnostics.stop()
+        return Response(status_code=204)
+
     @app.put("/api/v2/system/mode", dependencies=[Depends(admin)])
     def mode(body: ModeChange, s: SecurityService = Depends(service)):
         return s.set_mode(body.mode, body.expected_revision)
@@ -318,7 +334,13 @@ def create_app(config: dict | None = None) -> FastAPI:
             return Response(
                 s.latest["jpeg"],
                 media_type="image/jpeg",
-                headers={"X-Frame-Id": s.latest["frame_id"]},
+                headers={
+                    "X-Frame-Id": s.latest["frame_id"],
+                    "X-Observed-Ms": str(
+                        s.latest["received_ms"] - s.latest.get("capture_age_ms", 0)
+                    ),
+                    "X-Received-Ms": str(s.latest["received_ms"]),
+                },
             )
 
     @app.get("/api/v2/commands", dependencies=[Depends(admin)])

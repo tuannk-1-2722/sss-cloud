@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from tools.evaluate import read_manifest, summarize
+from tools.evaluate import read_manifest, run_visits, summarize
 
 
 def test_manifest_prevents_same_frame_being_used_across_splits(tmp_path):
@@ -47,3 +47,8 @@ def test_metrics_keep_unknown_misses_and_ineligible_faces_in_all_visit_denominat
     assert report["unknown_alarm_event_recall_all"]["value"] == 0.5
     assert report["unknown_alarm_event_recall_eligible"]["value"] == 1
     assert report["known_correct_visit"]["value"] is None
+
+
+def test_empty_gallery_is_not_scored_as_unknown_recognition_success(cfg, tmp_path):
+    with pytest.raises(ValueError, match="nonempty gallery"):
+        run_visits([], tmp_path, cfg, {}, None)

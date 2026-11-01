@@ -19,14 +19,20 @@ video:
   max_viewers: 3
   stale_ms: 3000
 analysis:
+  housekeeping_ms: 250
   monitoring_interval_ms: 300
   enrollment_interval_ms: 1000
+diagnostics:
+  history_limit: 256
+  trace_duration_ms: 120000
 zones:
   # Synthetic left-to-right layout. MUST be replaced and validated for the actual camera.
   approach: [0.05, 0.05, 0.40, 0.90]
   doorstep: [0.55, 0.05, 0.40, 0.90]
   stable_observations: 2
 policy:
+  flow_version: early-evidence-v1
+  completed_history_limit: 20
   confirm_votes: 3
   confirmation_span_ms: 600
   vote_window: 5 # Deprecated compatibility key; evidence is bounded by time and 128 entries.
@@ -75,6 +81,8 @@ environment:
   low_light_p95: 65
   max_bright_ratio: 0.80
 vision:
+  # Identity acquisition can span the neutral gap; alarm geometry still uses A/B.
+  recognition_region: [0.05, 0.05, 0.90, 0.90]
   opencv_threads: 2
   face_confidence: 0.90
   face_nms: 0.30

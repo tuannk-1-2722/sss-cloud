@@ -1,5 +1,17 @@
 # Kiểm chứng, calibration và demo
 
+Nâng cấp lượt ngắn xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md). Giữ model
+baseline; bổ sung kiểm identity trước B, khe ROI, quay mặt khi vặn khóa, lượt
+ngắn không đủ mặt, reentry, người lạ, completion idle và STOP/disarm race.
+Thời điểm alarm/hiển thị sau khi rời ảnh phải đo riêng trên hardware; mục tiêu
+người dùng cho phép khoảng 3–4 giây, không là kết quả đã nghiệm thu. Replay
+scheduled không thay HIL hoặc holdout. Thay flow/ROI làm profile hash đổi.
+Kiểm tra software ngày 01/11/2026: `tools.check --http` đạt 138 test, lint,
+format và HTTP smoke. Linux biệt lập đạt 137 pass/1 skip (thiếu Node); 13 ca Node
+đạt local. Flow mới đã triển khai Oracle 22:27 ngày 01/11; gallery rỗng và
+`CAMERA_PROFILE_CHANGED` vẫn chặn giám sát. Chưa có holdout/người lạ độc lập
+hoặc HIL của flow mới; không tự cập nhật calibration để vượt gate.
+
 Các con số trong YAML là **seed**. Chỉ report từ camera/laptop/bố trí thực của nhóm mới cho biết phạm vi đã đạt. Simulator kiểm luồng; unit test kiểm quy tắc; ONNX smoke kiểm model load. Không phép nào thay độ chính xác, độ trễ đầu-cuối hoặc kiểm nguồn/còi thật.
 
 **Topology hiện tại đã chọn:** ESP32 → backend/AI trên Oracle; laptop chỉ mở

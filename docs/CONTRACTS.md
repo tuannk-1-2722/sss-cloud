@@ -270,3 +270,33 @@ Các API dưới đây **không thay đổi** ESP32 device hello/sync/frames con
 - **Migrations**: `002_cloud_outbox.sql` thêm bảng outbox riêng, không sửa `001_initial.sql`. Thay đổi thêm cloud mode không làm đảo thứ tự command/ACK hoặc bỏ freshness/revision gates.
 
 Các lỗi xác thực/validation không được echo `jpeg`, gallery, token. Không mở cloud service qua plain HTTP.
+
+## Chẩn đoán nhận diện — 01/11/2026
+
+- `Observation` có thêm `evidence` tùy chọn: min_side_px, eye_distance_px,
+  blur/eye_blur, clipped, face_confidence, s1/s2; chỉ số hữu hạn, không vector.
+  `tracking_reason` tùy chọn mô tả association. Producer/consumer Observation
+  (gồm cloud service/adapter nếu dùng topology tách AI) phải nâng cùng phiên bản;
+  firmware gửi JPEG không cần tạo các field này. Synthetic endpoint chỉ được dùng
+  trong simulation như trước, không cho đưa evidence giả vào hardware.
+  `identity_eligible` là boolean strict, mặc định false cho producer cũ; true cho
+  phép tích evidence trong ROI dù anchor ở khe trung tính. Nó không cấp geometry
+  hay incoming/alarm. Numeric NumPy từ detector được đổi thành Python bool trước
+  khi tạo Observation; không nới strict validation của HTTP.
+- GET `/api/v2/diagnostics/recognition?after=0`: admin session, no-store,
+  ring metadata hữu hạn, sequence/counts và trạng thái trace. Không trả ảnh/vector
+  hay danh tính thật. `after` chỉ lọc RAM, không đọc lịch sử DB.
+- POST `/api/v2/diagnostics/recognition/start`: admin + CSRF, bắt đầu cửa sổ
+  `diagnostics.trace_duration_ms`, clear ring/counts và đổi alias key; sequence
+  tiếp tục tăng. Không thay mode/session/gallery hoặc quyền điều khiển còi.
+- DELETE `/api/v2/diagnostics/recognition`: admin + CSRF, dừng journal trace,
+  HTTP204. Ring vẫn hữu hạn; restart xóa toàn bộ RAM trace.
+- Mặc định không ghi journal từng frame; chỉ log trong cửa sổ operator bật.
+  Cấu hình history_limit tối đa1024, trace_duration_ms tối đa300000; mặc định
+  trong YAML, không thuộc camera calibration hash vì không đổi quyết định AI.
+- Status thêm `recent_visits` hữu hạn: visit_completed gồm identity/person_id,
+  direction, completion_reason, last_observed_ms/completed_ms, không phải còi mới.
+  Lịch sử DB có event info `visit_completed`; completion không lưu thêm ảnh.
+- GET latest-frame thêm X-Observed-Ms và X-Received-Ms (clock monotonic server,
+  observed là ước lượng nguồn từ sync), để recorder giữ riêng capture/arrival.
+  Recorder cũ vẫn dùng được X-Frame-Id; timing client_poll phải ghi đúng giới hạn.

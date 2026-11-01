@@ -9,9 +9,9 @@ import cv2
 import numpy as np
 
 from .config import ROOT
-from .contracts import Observation
+from .contracts import FaceEvidence, Observation
 from .matching import match, normalize
-from .spatial import zone_for
+from .spatial import Rect
 from .tracking import ConservativeTracker as ConservativeTracker
 
 
@@ -61,7 +61,9 @@ class OpenCVVision:
         for artifact in [*manifest["artifacts"], manifest["wrapper"]]:
             path = ROOT / "models" / artifact["file"]
             if (
-                not path.is_file()
+                not path.resolve().is_relative_to((ROOT / "models").resolve())
+                or not path.is_file()
+                or ("size" in artifact and path.stat().st_size != artifact["size"])
                 or hashlib.sha256(path.read_bytes()).hexdigest() != artifact["sha256"]
             ):
                 raise ValueError("MODEL_MISSING_OR_HASH_MISMATCH")
@@ -132,8 +134,9 @@ class OpenCVVision:
         v = self.cfg["vision"]
         x, y, w, h = map(float, face[:4])
         required = v["enrollment_face_min_px"] if enrollment else v["face_min_px"]
+        metrics = {"min_side_px": min(w, h)}
         if min(w, h) < required:
-            return None, {"reason": "FACE_TOO_SMALL", "min_side_px": min(w, h)}
+            return None, {"reason": "FACE_TOO_SMALL", **metrics}
         landmarks = np.asarray(face[4:14]).reshape(5, 2)
         if not np.isfinite(landmarks).all():
             return None, {"reason": "LANDMARKS_INVALID"}
@@ -150,16 +153,19 @@ class OpenCVVision:
         gray = cv2.resize(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), (112, 112))
         blur = float(cv2.Laplacian(gray, cv2.CV_64F).var())
         clipped = max(float((gray <= 10).mean()), float((gray >= 245).mean()))
+        metrics.update(
+            blur=blur,
+            clipped=clipped,
+            eye_distance_px=float(np.linalg.norm(landmarks[1] - landmarks[0])),
+        )
         if blur < v["blur_min"]:
-            return None, {"reason": "FACE_BLURRED", "blur": blur}
+            return None, {"reason": "FACE_BLURRED", **metrics}
         if clipped > v["clipped_fraction_max"]:
-            return None, {"reason": "FACE_EXPOSURE", "clipped": clipped}
+            return None, {"reason": "FACE_EXPOSURE", **metrics}
         aligned = self.recognizer.alignCrop(image, np.asarray(face, np.float32))
         return aligned, {
+            **metrics,
             "reason": None,
-            "blur": blur,
-            "clipped": clipped,
-            "min_side_px": min(w, h),
             "perceptual_hash": perceptual_hash(aligned),
             "pose_signature": [
                 float(
@@ -206,6 +212,7 @@ class OpenCVVision:
         height, width = image.shape[:2]
         self.last_environment = environment_quality(image, self.cfg)
         persons, faces = self.detections(image)
+        self.last_counts = {"person_count": len(persons), "face_count": len(faces)}
         boxes, face_for_box, valid = list(persons), [[] for _ in persons], [True for _ in persons]
         ambiguous = set()
         for face in faces:
@@ -236,7 +243,17 @@ class OpenCVVision:
             zip(ids, boxes, face_for_box, valid, strict=True)
         ):
             decision, person_id, reason = "NOT_CHECKED", None, None
-            if zone_for(box, self.cfg["zones"]) == "B":
+            evidence = {}
+            if len(associated) == 1:
+                evidence["min_side_px"] = float(min(associated[0][2:4]))
+                if associated[0].shape[0] >= 15:
+                    evidence["face_confidence"] = float(associated[0][14])
+            identity_eligible = bool(
+                Rect(*self.cfg["vision"]["recognition_region"]).contains(
+                    box[0] + box[2] / 2, box[1] + box[3] / 2
+                )
+            )
+            if identity_eligible:
                 decision = "NO_FACE"
                 if not self.last_environment["usable"]:
                     decision, reason = "UNCERTAIN", self.last_environment["reason"]
@@ -244,10 +261,20 @@ class OpenCVVision:
                     decision, reason = "UNCERTAIN", "FACE_ASSOCIATION_AMBIGUOUS"
                 elif associated and embedded < self.cfg["policy"]["max_simultaneous"]:
                     aligned, quality = self.quality(image, associated[0])
+                    evidence.update(
+                        {
+                            name: quality[name]
+                            for name in FaceEvidence.model_fields
+                            if name in quality
+                        }
+                    )
                     if aligned is None:
                         decision, reason = "UNCERTAIN", quality["reason"]
                     else:
                         result = match(self.feature(aligned), gallery, self.cfg["vision"])
+                        evidence.update(
+                            {name: result[name] for name in ("s1", "s2") if name in result}
+                        )
                         decision, person_id = result["decision"], result["person_id"]
                         reason = result.get("reason")
                         embedded += 1
@@ -261,6 +288,9 @@ class OpenCVVision:
                     person_id=person_id,
                     geometry_valid=geometry_valid,
                     reason=reason,
+                    evidence=FaceEvidence(**evidence) if evidence else None,
+                    identity_eligible=identity_eligible,
+                    tracking_reason=self.tracker.last_reasons.get(key),
                 )
             )
         return results

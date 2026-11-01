@@ -1,5 +1,9 @@
 # Chỉ mục tài liệu — Smart Security System v2.1
 
+Nâng cấp đang thực hiện: [`RECOGNITION_UPGRADE.md`](RECOGNITION_UPGRADE.md) —
+quyết định đã duyệt cho lượt đến cửa ngắn, trace/pilot và gate nhận diện che mặt.
+Chuẩn bị và thao tác tại trường: [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md).
+
 **Đọc file này trước**, sau đó mở đúng tài liệu cần thiết theo task. Không cần nạp
 toàn bộ `docs/` mỗi lần; thứ tự ưu tiên dưới đây cho biết khi nào cần đọc gì.
 

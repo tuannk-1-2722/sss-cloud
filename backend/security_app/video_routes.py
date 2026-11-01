@@ -113,6 +113,7 @@ def install_video_routes(app, service, admin):
         started = last_received = s.now()
         accepted_frames = 0
         close_code, close_reason = 1000, "DEVICE_DISCONNECTED"
+        timeout_phase = "receive"
         try:
             socket.app.state.auth.device(socket)
             # Device channel has no browser-cookie authority and accepts no browser Origin.
@@ -125,6 +126,7 @@ def install_video_routes(app, service, admin):
             await socket.accept()
             await socket.send_json({"protocol_version": 1, "window_frames": 2})
             while not s.stopping:
+                timeout_phase = "receive"
                 async with asyncio.timeout(2):
                     message = await socket.receive()
                 if message["type"] == "websocket.disconnect":
@@ -137,6 +139,7 @@ def install_video_routes(app, service, admin):
                 result = await run_in_threadpool(s.accept_video, meta, jpeg, s.now())
                 accepted_frames += 1
                 last_received = s.now()
+                timeout_phase = "ack"
                 async with asyncio.timeout(1):
                     await socket.send_json(result)
         except DomainError as exc:
@@ -144,6 +147,8 @@ def install_video_routes(app, service, admin):
             close_code, close_reason = (1009 if exc.status == 413 else 1008), exc.code
             await socket.close(code=close_code, reason=close_reason)
         except TimeoutError:
+            with s.lock:
+                s.diagnostics.record(f"video_{timeout_phase}_timeout", s.now())
             close_code, close_reason = 1008, "VIDEO_TIMEOUT"
             await socket.close(code=close_code, reason=close_reason)
         except (sqlite3.Error, OSError):
