@@ -1,5 +1,11 @@
 # Kiểm chứng, calibration và demo
 
+Cập nhật02/11: `early-evidence-v2` thêm xác nhận known-only bằng hai ảnh mạnh;
+xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md). Local 158 test PASS, Linux 157 PASS/
+1skip, HTTP smoke PASS; validation native clear/mask thu đủ đúng2/2, chưa là
+holdout. Mục người lạ PASS theo xác nhận của người dùng; không biến các clip
+known bị gắn nhãn nhầm thành số đo unknown. Cần freeze rồi đối chứng mới.
+
 Nâng cấp lượt ngắn xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md). Giữ model
 baseline; bổ sung kiểm identity trước B, khe ROI, quay mặt khi vặn khóa, lượt
 ngắn không đủ mặt, reentry, người lạ, completion idle và STOP/disarm race.
@@ -122,6 +128,17 @@ request sync nhỏ nhất: không gọi đây là phép đo exposure→paint ch�
 thử vật lý/clock được hiệu chỉnh khi nghiệm thu p95 đầu-cuối video dưới1giây.
 
 Thời gian recorder là thời điểm nhận ảnh ở client, xấp xỉ cadence quan sát. Không dùng nó như timestamp exposure hoặc độ trễ còi vật lý. Quan sát quá ít/ảnh mất cần ghi vào biên bản; không chỉ giữ các lượt đẹp. Tool không tự xác nhận consent hoặc nhãn đúng; người nhóm review chúng.
+
+Recorder CLI chờ luồng có bốn frame khác nhau trong hai giây trước khi đếm ngược
+và tính thời gian lượt; warmup/đếm ngược vẫn gia hạn viewer lease. Nếu khởi động
+quá 20 giây chưa có luồng ổn định thì chưa bắt đầu lượt. Mỗi clip đã bắt đầu có
+`capture-health.json`; clip thiếu số ảnh hoặc chỉ phủ dưới 80% thời gian tại
+client không được thêm manifest, ảnh lỗi vẫn giữ riêng để chẩn đoán.
+Ảnh và timestamp của lượt thu thiếu được giữ trong `visit.partial.json`, không
+được đưa vào manifest chính như một lượt thu đạt. Ghi cả số
+lượt thu thất bại vào báo cáo reliability; không bỏ chúng để nâng accuracy hoặc
+gọi những lượt còn lại là holdout thành công. Coverage của recorder không chứng
+minh đủ ảnh mặt rõ, đúng geometry hay đáp ứng độ trễ còi.
 
 `data/camera-v1/visits.jsonl`: mỗi dòng một object. Ví dụ schema (các path phải là ảnh JPEG thực, duy nhất; không copy ảnh để tăng N):
 

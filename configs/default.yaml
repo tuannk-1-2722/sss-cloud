@@ -31,10 +31,15 @@ zones:
   doorstep: [0.55, 0.05, 0.40, 0.90]
   stable_observations: 2
 policy:
-  flow_version: early-evidence-v1
+  flow_version: early-evidence-v2
   completed_history_limit: 20
   confirm_votes: 3
   confirmation_span_ms: 600
+  # Optional known-only path. Both images must already pass all vision quality gates.
+  strong_known_enabled: true
+  strong_known_min_score: 0.60
+  strong_known_min_margin: 0.16
+  strong_known_span_ms: 500
   vote_window: 5 # Deprecated compatibility key; evidence is bounded by time and 128 entries.
   vote_window_ms: 4000
   vote_spacing_ms: 300 # Deprecated compatibility key; every distinct eligible frame contributes.

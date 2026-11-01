@@ -118,7 +118,7 @@ def validate_config(c: dict) -> None:
         raise ValueError("Approach and doorstep zones must not overlap")
     v, p, e, alarm, limits = (c[k] for k in ("vision", "policy", "enrollment", "alarm", "limits"))
     Rect(*v["recognition_region"])
-    if p["flow_version"] != "early-evidence-v1" or p["completed_history_limit"] > 100:
+    if p["flow_version"] != "early-evidence-v2" or p["completed_history_limit"] > 100:
         raise ValueError("Unsupported recognition flow or excessive completed visit history")
     q = c["environment"]
     if not 0 < q["min_median_luma"] < q["low_light_p95"] <= 255:
@@ -145,6 +145,12 @@ def validate_config(c: dict) -> None:
         raise ValueError("Invalid evidence count")
     if p["confirmation_span_ms"] > p["vote_window_ms"]:
         raise ValueError("Confirmation duration cannot fit inside evidence window")
+    if not v["accept"] < p["strong_known_min_score"] <= 1:
+        raise ValueError("Strong known score must be stricter than normal acceptance")
+    if not v["margin"] <= p["strong_known_min_margin"] <= 2:
+        raise ValueError("Strong known margin cannot weaken normal identity separation")
+    if not 500 <= p["strong_known_span_ms"] <= p["vote_window_ms"]:
+        raise ValueError("Strong known duration must be at least 500ms and fit evidence window")
     video, analysis = c["video"], c["analysis"]
     if not 100 <= analysis["housekeeping_ms"] <= 1000:
         raise ValueError("Housekeeping interval must be between 100 and 1000ms")

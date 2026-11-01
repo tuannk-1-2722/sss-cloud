@@ -23,6 +23,8 @@ class Track:
     entered_b: int = 0
     b_count: int = 0
     votes: deque = field(default_factory=lambda: deque(maxlen=128))
+    strong_votes: deque = field(default_factory=lambda: deque(maxlen=128))
+    strong_confirmed: bool = False
     last_vote: int = -100000
     confirmed: str = "UNCERTAIN"
     person_id: str | None = None
@@ -66,6 +68,8 @@ class PolicyEngine:
     @staticmethod
     def _clear_evidence(track):
         track.votes.clear()
+        track.strong_votes.clear()
+        track.strong_confirmed = False
         track.confirmed, track.person_id = "UNCERTAIN", None
         track.last_eligible = track.last_vote = -100000
 
@@ -272,6 +276,8 @@ class PolicyEngine:
         p = self.config["policy"]
         while track.votes and now - track.votes[0][0] > p["vote_window_ms"]:
             track.votes.popleft()
+        while track.strong_votes and now - track.strong_votes[0][0] > p["vote_window_ms"]:
+            track.strong_votes.popleft()
         if now > track.last_vote:
             kind, pid = observation.decision, observation.person_id
             if kind == "KNOWN" and pid is None:
@@ -283,10 +289,24 @@ class PolicyEngine:
                 if track.visit_id is not None and not track.completed:
                     track.identity_conflict = True
                 track.votes.clear()
+                track.strong_votes.clear()
+                track.strong_confirmed = False
                 track.confirmed, track.person_id = "UNCERTAIN", None
                 track.last_eligible = -100000
             track.votes.append((now, kind, pid))
             track.last_vote = now
+            evidence = observation.evidence
+            if (
+                p["strong_known_enabled"]
+                and kind == "KNOWN"
+                and evidence is not None
+                and evidence.s1 is not None
+                and evidence.s1 >= p["strong_known_min_score"]
+                and (
+                    evidence.s2 is None or evidence.s1 - evidence.s2 >= p["strong_known_min_margin"]
+                )
+            ):
+                track.strong_votes.append((now, pid))
         known_ids = {v[2] for v in track.votes if v[1] == "KNOWN"}
         known_count = sum(v[1] == "KNOWN" for v in track.votes)
         unknown_count = sum(v[1] == "UNKNOWN" for v in track.votes)
@@ -300,14 +320,34 @@ class PolicyEngine:
             and known_span >= p["confirmation_span_ms"]
         ):
             track.confirmed, track.person_id = "KNOWN", next(iter(known_ids))
+            track.strong_confirmed = False
             track.last_eligible = max(v[0] for v in track.votes if v[1] == "KNOWN")
+        elif (
+            p["strong_known_enabled"]
+            and len(known_ids) == 1
+            and not unknown_count
+            and not track.identity_conflict
+            and len(track.strong_votes) >= 2
+            and track.strong_votes[-1][0] - track.strong_votes[0][0] >= p["strong_known_span_ms"]
+        ):
+            track.confirmed, track.person_id = "KNOWN", next(iter(known_ids))
+            track.strong_confirmed = True
+            track.last_eligible = track.strong_votes[-1][0]
         elif (
             not known_ids
             and unknown_count >= p["confirm_votes"]
             and unknown_span >= p["confirmation_span_ms"]
         ):
             track.confirmed, track.person_id = "UNKNOWN", None
+            track.strong_confirmed = False
             track.last_eligible = max(v[0] for v in track.votes if v[1] == "UNKNOWN")
+        elif track.strong_confirmed and unknown_count:
+            # Contradictory evidence cancels the shorter known-only confirmation.
+            track.confirmed, track.person_id = "UNCERTAIN", None
+            track.strong_confirmed = False
+            track.last_eligible = -100000
+            if track.visit_id is not None and not track.completed:
+                track.identity_conflict = True
         if now - track.last_eligible > p["identity_fresh_ms"]:
             track.confirmed, track.person_id = "UNCERTAIN", None
 

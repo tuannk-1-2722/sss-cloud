@@ -95,6 +95,17 @@ Geometry/tracking/policy dùng cùng observed time, TTL lệnh dùng clock hiệ
 
 Bằng chứng ROI trước B vẫn phải đủ số phiếu/span/freshness, không hạ ngưỡng matching vì hành động ngắn. Kết quả KNOWN của lượt đã ghi không bị xóa khỏi lịch sử khi ảnh sau mất mặt; identity hiện tại có thể hết freshness. `policy.flow_version` và ROI thuộc hash calibration, thay đổi đòi review profile. Model vẫn NanoDet/YuNet/SFace 128d trong bản nâng cấp này; ứng viên InsightFace tạm hoãn theo quyết định người dùng.
 
+`early-evidence-v2` thêm nhánh known-only `strong_known_enabled`: hai observation
+KNOWN cùng người đã qua quality, có `evidence.s1 >= strong_known_min_score` và
+margin tới người thứ hai ít nhất `strong_known_min_margin` (nếu có), trải ít nhất
+`strong_known_span_ms`. Nhánh này không nhận evidence thiếu score, không trộn
+danh tính và không có UNKNOWN trong cửa sổ. Mặc định seed score 0.60, margin 0.16,
+span 500 ms; phải chặt hơn matching thường. UNKNOWN và đường xác nhận thường vẫn
+giữ `confirm_votes`/`confirmation_span_ms` cũ. Duplicate, evidence hết hạn, reset,
+reentry và revision vẫn giữ nguyên; UNKNOWN mâu thuẫn sau xác nhận rút gọn hủy
+xác nhận đó và làm kết quả cuối chưa xác định. Không cộng phiếu NO_FACE/UNCERTAIN.
+Các tham số này thuộc calibration hash, không dùng profile cũ để tự bật hardware.
+
 Gallery rỗng hoặc model/calibration lỗi chặn arm; không gọi mọi người là unknown. Threshold trong default là seed. Hardware arm cần validated profile đúng camera/config/model manifest và có report/reviewer.
 
 ## 5. Enrollment và gallery

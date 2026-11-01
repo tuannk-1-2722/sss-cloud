@@ -1,5 +1,38 @@
 # Nhận diện lượt đến cửa ngắn — quyết định 01/11/2026
 
+## Cập nhật 02/11/2026 — xác nhận người quen bằng cặp ảnh mạnh
+
+Người dùng yêu cầu tiếp tục tối ưu trên dữ liệu đã thu và chấp nhận mục người lạ
+**PASS theo xác nhận của người dùng**. Các clip mang nhãn U01 thực tế là cùng
+người đã đăng ký; đã sửa nhãn trong manifest riêng, giữ bản gốc. PASS này là
+quyết định nghiệm thu của người dùng, không phải phép đo người lạ từ các clip.
+
+Đã triển khai `early-evidence-v2` lúc **00:52 ngày 02/11** (giờ Việt Nam). Giữ
+NanoDet/YuNet/SFace, bộ lọc mặt/blur/exposure, matching accept/reject/margin.
+Thêm đường xác nhận KNOWN bằng hai ảnh có score cao hơn (seed 0.60), margin
+seed 0.16 nếu có người thứ hai, span ít nhất500ms. Cả hai vẫn phải qua quality;
+thiếu score, danh tính xung đột, UNKNOWN trong cửa sổ hoặc hết freshness không
+được dùng đường rút gọn. Nhánh UNKNOWN vẫn cần3phiếu/600ms. Có thể tắt
+`strong_known_enabled` để dùng đường xác nhận thường; thay đổi cần review profile.
+
+So sánh native trên Oracle cùng model/gallery draft10mẫu, cùng8clip chẩn đoán:
+khi tắt nhánh mới, hai lượt thu đủ clear/mask đều chưa xác nhận; khi bật, cả hai
+đúng hồ sơ, không alarm. Sáu clip thu thiếu vẫn không xác nhận. Đây là validation
+của một người, không phải holdout hoặc chứng nhận accuracy. Ảnh tạm Oracle đã xóa.
+
+Kiểm tra software: local 158 test PASS; Linux 157 PASS/1 skip do thiếu Node, lint/format
+và HTTP smoke PASS. Có regression cho score/margin/span, duplicate, thiếu evidence,
+xung đột, UNKNOWN xen kẽ, hết hạn/reentry; worker STOP/revision tests vẫn đạt.
+
+Hiện có một draft đã đăng ký,10mẫu committed; chưa active. Source cloud khớp bản
+đã thử; model/service ready. Calibration giữ nguyên và vẫn chặn ARM/activate
+bằng `CAMERA_PROFILE_CHANGED`. Cần lượt đối chứng mới sau freeze và review thực
+tế trước ký calibration. Không tự khôi phục profile cũ hoặc coi validation là HIL.
+
+---
+
+## Quyết định và triển khai 01/11 (lịch sử)
+
 Người dùng đã duyệt phương án nghiên cứu ngày 01/11/2026: cả lượt 4–5 giây,
 dừng vặn khóa 1–2 giây; cho phép kết quả/còi sau khi rời ảnh khoảng 3–4 giây.
 Giữ ESP32-CAM/Oracle, được chỉnh góc và ánh sáng. Demo 1–2 known, 2–3 unknown;

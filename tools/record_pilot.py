@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import getpass
 import sys
-import time
 from pathlib import Path
 
 import httpx
@@ -77,13 +76,6 @@ def main():
                         flush=True,
                     )
                 input("Nhấn Enter khi đã chuẩn bị; bạn có thêm 5 giây để vào vị trí: ")
-                for count in range(5, 0, -1):
-                    print(f"Bắt đầu sau {count} giây...", flush=True)
-                    time.sleep(1)
-                print(
-                    f"ĐANG THU {args.seconds} GIÂY. Giữ đúng hành động của đoạn này tới khi công cụ báo xong.",
-                    flush=True,
-                )
                 capture_visit(
                     client,
                     directory=args.directory,
@@ -95,6 +87,9 @@ def main():
                     expected_person_id=pid,
                     face_eligible=condition == "clear",
                     progress=True,
+                    ready_timeout_s=20,
+                    countdown_s=5,
+                    require_coverage=True,
                 )
         finally:
             client.post("auth/logout", json={})
