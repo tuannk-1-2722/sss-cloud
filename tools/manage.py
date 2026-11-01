@@ -99,9 +99,7 @@ def main():
             bbox=np.array([0, 0, 112, 112, 1], dtype=np.float32),
             kps=landmarks,
         )
-        vision.face_analysis.models["recognition"].get(
-            np.zeros((112, 112, 3), np.uint8), face
-        )
+        vision.face_analysis.models["recognition"].get(np.zeros((112, 112, 3), np.uint8), face)
         feature = vision.feature(
             FaceRecord(
                 values=np.zeros(14, dtype=np.float32),

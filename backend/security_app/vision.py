@@ -133,10 +133,7 @@ class OpenCVVision:
             path = ROOT / "models" / artifact["file"]
             if (
                 not path.is_file()
-                or (
-                    "size" in artifact
-                    and path.stat().st_size != artifact["size"]
-                )
+                or ("size" in artifact and path.stat().st_size != artifact["size"])
                 or hashlib.sha256(path.read_bytes()).hexdigest() != artifact["sha256"]
             ):
                 raise ValueError("MODEL_MISSING_OR_HASH_MISMATCH")
@@ -281,13 +278,10 @@ class OpenCVVision:
             return None, {"reason": "FACE_IMAGE_UNAVAILABLE"}
         started = time.perf_counter()
         self.face_analysis.models["recognition"].get(face.model_image, face.source)
-        face.embedding = np.asarray(
-            face.source.normed_embedding, dtype=np.float32
-        ).reshape(-1)
+        face.embedding = np.asarray(face.source.normed_embedding, dtype=np.float32).reshape(-1)
         if hasattr(self, "last_timings"):
             self.last_timings["embedding_ms"] = round(
-                self.last_timings.get("embedding_ms", 0)
-                + (time.perf_counter() - started) * 1000,
+                self.last_timings.get("embedding_ms", 0) + (time.perf_counter() - started) * 1000,
                 2,
             )
         if (
