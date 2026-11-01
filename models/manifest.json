@@ -14,14 +14,14 @@
     {
       "name": "insightface_detection",
       "file": "buffalo_l/det_10g.onnx",
-      "archive_path": "smart_security/models/buffalo_l/det_10g.onnx",
+      "url": "https://huggingface.co/immich-app/buffalo_l/resolve/d09715916a0778919a770c343533641e250b8699/detection/model.onnx",
       "sha256": "5838f7fe053675b1c7a08b633df49e7af5495cee0493c7dcf6697200b85b5b91",
       "size": 16923827
     },
     {
       "name": "insightface_recognition",
       "file": "buffalo_l/w600k_r50.onnx",
-      "archive_path": "smart_security/models/buffalo_l/w600k_r50.onnx",
+      "url": "https://huggingface.co/immich-app/buffalo_l/resolve/d09715916a0778919a770c343533641e250b8699/recognition/model.onnx",
       "sha256": "4c06341c33c2ca1f86781dab0e829f88ad5b64be9fba56e56bc9ebdefc619e43",
       "size": 174383860
     }

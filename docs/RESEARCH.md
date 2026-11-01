@@ -17,7 +17,7 @@
 | R09 | [FastAPI async/concurrency](https://fastapi.tiangolo.com/async/) | Async phù hợp I/O; việc CPU cần cách chạy phù hợp | Một worker vision riêng, API/control không chờ inference; native inference có thể kẹt nên health/reset và process restart có giới hạn |
 | R10 | [SQLite WAL](https://www.sqlite.org/wal.html), [SQLite backup API](https://www.sqlite.org/backup.html) | WAL dùng shared-memory/local host; backup API tạo snapshot nhất quán | SQLite local trên máy server, không DB đặt network drive; backup khi stopped + media/checksums |
 | R11 | [Telegram Bot API](https://core.telegram.org/bots/api) | sendMessage/error responses và retry_after khi giới hạn | Extension text outbox tắt mặc định; retries có trần, không hứa exactly-once sau timeout |
-| R12 | InsightFace buffalo_l artifacts trong archive do nhóm cung cấp | SCRFD detector + ArcFace recognizer; manifest khóa SHA256 của `det_10g.onnx` và `w600k_r50.onnx` | Adapter chỉ chạy detector trước; recognition chỉ sau zone/quality gate. Archive không kèm terms sử dụng model; xác minh terms trước khi phân phối hoặc dùng ngoài phạm vi được phép |
+| R12 | InsightFace buffalo_l ONNX artifacts từ Hugging Face `immich-app/buffalo_l`, revision `d09715916a0778919a770c343533641e250b8699` | SCRFD detector + ArcFace recognizer; manifest khóa URL, SHA256 và kích thước của `det_10g.onnx` và `w600k_r50.onnx` | Adapter chỉ chạy detector trước; recognition chỉ sau zone/quality gate. Repo model tham chiếu terms InsightFace; xác minh quyền sử dụng trước khi phân phối hoặc dùng ngoài phạm vi được phép |
 
 Quy tắc A → B, tâm body bbox, stability/votes/freshness, warning không đủ mặt/chiều và suppression per-visit là **thiết kế của dự án**, không kết luận trực tiếp từ các nguồn trên. Nó giúp demo đường đi kiểm soát nhưng có thể bỏ/nhầm chiều khi tracking mất, góc camera xấu hoặc người che nhau; cần evidence G2/G4.
 
@@ -36,7 +36,7 @@ R01 còn có [`camera_fb_t.timestamp`](https://github.com/espressif/esp32-camera
 
 ## 3. Artifacts và license đã ghim
 
-`models/manifest.json` sở hữu provenance/size/SHA256. NanoDet tải từ OpenCV Zoo; InsightFace buffalo_l weights lấy từ archive do nhóm cung cấp. Không commit hoặc phân phối ONNX và không đưa toàn archive lên VM vì archive có thể chứa dữ liệu sinh trắc.
+`models/manifest.json` sở hữu provenance/URL revision/size/SHA256. NanoDet tải từ OpenCV Zoo; InsightFace buffalo_l weights tải trực tiếp từ Hugging Face revision đã ghim. Không commit hoặc phân phối ONNX nếu chưa xác minh quyền sử dụng.
 
 | Thành phần | Artifact | License tại commit ghim |
 |---|---|---|

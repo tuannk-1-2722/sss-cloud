@@ -208,13 +208,13 @@ python3.12 -m venv .venv
 
 Đối chiếu SHA256 archive với Windows. Nếu đã có deployment trong thư mục, không extract đè khi service đang chạy; dừng và chuẩn bị thư mục release mới.
 
-Trên máy Windows tin cậy, chạy `tools.download_models --insightface-archive "C:\path\to\smart_security_module.zip"` để chỉ trích xuất và kiểm SHA256 hai file ONNX cần thiết. Chuyển **chỉ** `models/buffalo_l/det_10g.onnx` và `models/buffalo_l/w600k_r50.onnx` lên VM vào cùng đường dẫn; không chuyển ZIP vì nó có thể chứa ảnh/cache sinh trắc. Sau đó chạy trên VM:
+Trên VM inference, chạy trực tiếp:
 
 ```bash
 .venv/bin/python -m tools.download_models
 ```
 
-Lệnh trên VM xác minh hai file đó và tải NanoDet/wrapper đã ghim. Giữ ZIP ngoài repo và không đưa ảnh, cache, runtime hay gallery lên VM. Giữ nguyên package pin trong repo. Nếu wheel cho kiến trúc máy thiếu hoặc package/model download lỗi, lưu tên package/lỗi để xử lý đúng; chưa tiếp tục đưa dữ liệu thật vào. Không tải model mới thay cho weights đã ghim.
+Lệnh tải NanoDet, wrapper và hai weights `buffalo_l` từ các URL/revision đã ghim trong `models/manifest.json`, rồi kiểm SHA256/kích thước trước khi đưa vào sử dụng. Không cần ZIP hoặc chuyển model thủ công. Không tải ảnh, cache, runtime hay gallery lên VM. Giữ nguyên package pin trong repo. Nếu wheel cho kiến trúc máy thiếu hoặc package/model download lỗi, lưu tên package/lỗi để xử lý đúng; chưa tiếp tục đưa dữ liệu thật vào. Không tải model mới thay cho weights đã ghim. Xác minh terms sử dụng InsightFace trước khi phân phối hoặc dùng ngoài phạm vi được phép.
 
 ## 6. Cấu hình runtime riêng trên VM
 

@@ -143,7 +143,7 @@ Dùng **hai process/host độc lập**:
 uvicorn security_app.cloud_service:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
-Cloud reverse proxy HTTPS phía trước, **không** trưng API token hay mở cloud inference không xác thực. `GET /health/ready` với bearer phải trả `ready: true`. `GET /` phải yêu cầu Basic authentication và hiển thị dashboard cloud. Chuyển riêng hai ONNX InsightFace đã kiểm hash vào `models/buffalo_l/`, không chuyển ZIP có thể chứa ảnh/cache; sau đó chạy `python -m tools.download_models` để xác minh weights và tải artifact còn lại.
+Cloud reverse proxy HTTPS phía trước, **không** trưng API token hay mở cloud inference không xác thực. `GET /health/ready` với bearer phải trả `ready: true`. `GET /` phải yêu cầu Basic authentication và hiển thị dashboard cloud. Chạy `python -m tools.download_models` trên cloud host để tải NanoDet và hai weights `buffalo_l` từ các revision đã ghim, đồng thời xác minh hash/kích thước. Không cần chuyển ZIP hoặc weights thủ công.
 
 **Gateway laptop**: giữ `SSS_CONFIG` hardware đã hiệu chỉnh; trong YAML:
 

@@ -103,11 +103,11 @@ Chạy bằng Python trong venv, khoảng 15–20 giây. Test ba ca unknown/dire
 
 ```powershell
 .\.venv\Scripts\python.exe -m tools.manage bootstrap
-.\.venv\Scripts\python.exe -m tools.download_models --insightface-archive "C:\path\to\smart_security_module.zip"
+.\.venv\Scripts\python.exe -m tools.download_models
 .\.venv\Scripts\python.exe -m tools.manage models-smoke
 ```
 
-Tool tải NanoDet đã ghim, lấy riêng detector/recognizer `buffalo_l` từ ZIP được chỉ định và kiểm SHA256. Nó không giải nén ảnh mặt hoặc embedding cache trong ZIP. Không đưa ZIP lên VM; khi triển khai cloud, chỉ chuyển hai file ONNX đã kiểm hash theo [hướng dẫn Level 3](docs/LEVEL3_SETUP_GUIDE.md), rồi chạy `tools.download_models` trên VM.
+Tool tải NanoDet và hai weights `buffalo_l` từ các revision đã ghim trong manifest, kiểm tra SHA256/kích thước trước khi cài. Không cần ZIP; khi triển khai cloud, chạy cùng lệnh trên máy chủ inference để tải và xác minh model tại chỗ. Terms sử dụng weights InsightFace cần được xác minh trước khi phân phối hoặc dùng ngoài phạm vi được phép.
 
 4. Copy `firmware/security_node/secrets.example.h` → `secrets.h`; điền Wi-Fi 2,4 GHz, IP LAN laptop, device token private, active level buzzer đúng module. Firmware chỉ nhận cấu hình board đúng loại này.
 5. Cài Arduino CLI **1.2.2**, profile ghim core **3.3.0**, ArduinoJson **7.4.1**:
