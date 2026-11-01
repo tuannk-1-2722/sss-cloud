@@ -141,9 +141,9 @@ class OpenCVVision:
             ):
                 raise ValueError("MODEL_MISSING_OR_HASH_MISMATCH")
         try:
+            import onnxruntime
             from insightface.app import FaceAnalysis
             from insightface.app.common import Face
-            import onnxruntime
         except ImportError as exc:
             raise RuntimeError("INSIGHTFACE_DEPENDENCIES_MISSING") from exc
 
