@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import time
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -13,6 +14,76 @@ from .contracts import Observation
 from .matching import match, normalize
 from .spatial import zone_for
 from .tracking import ConservativeTracker as ConservativeTracker
+
+
+@dataclass(slots=True)
+class FaceRecord:
+    values: np.ndarray
+    source: object
+    model_image: np.ndarray | None = None
+    embedding: np.ndarray | None = None
+    aligned: np.ndarray | None = None
+
+    def __getitem__(self, key):
+        return self.values[key]
+
+
+def preprocess_image(image: np.ndarray, aggressive: bool = False) -> tuple[np.ndarray, float]:
+    height, width = image.shape[:2]
+    scale = max(1.0, 360.0 / min(height, width))
+    if scale > 1:
+        image = cv2.resize(
+            image,
+            (int(width * scale), int(height * scale)),
+            interpolation=cv2.INTER_LANCZOS4,
+        )
+    blue, green, red = cv2.split(image)
+    means = [float(channel.mean()) for channel in (blue, green, red)]
+    mean_gray = sum(means) / 3
+    balanced = cv2.merge(
+        [
+            cv2.convertScaleAbs(
+                channel, alpha=float(np.clip(mean_gray / (mean + 1e-4), 0.75, 1.35))
+            )
+            for channel, mean in zip((blue, green, red), means, strict=True)
+        ]
+    )
+    lab = cv2.cvtColor(balanced, cv2.COLOR_BGR2LAB)
+    light, a, b = cv2.split(lab)
+    mean_light = float(light.mean())
+    height, width = light.shape
+    reduced = cv2.resize(
+        light, (max(16, width // 8), max(16, height // 8)), interpolation=cv2.INTER_AREA
+    )
+    illumination = cv2.addWeighted(
+        cv2.GaussianBlur(reduced, (0, 0), 5),
+        0.5,
+        cv2.GaussianBlur(reduced, (0, 0), 15),
+        0.5,
+        0,
+    )
+    illumination = cv2.resize(illumination, (width, height), interpolation=cv2.INTER_LINEAR)
+    target = 140.0 if aggressive else 120.0
+    max_gain = 3.2 if aggressive else 2.6
+    gain = np.clip(target / (illumination.astype(np.float32) + 20), 0.7, max_gain)
+    exponent = 0.75 if aggressive else 0.65
+    adjusted = np.clip(light.astype(np.float32) * gain**exponent, 0, 255).astype(np.uint8)
+    if aggressive:
+        gamma = 0.45
+    elif mean_light < 75:
+        gamma = 0.55 + 0.35 * (mean_light / 75)
+    elif mean_light > 165:
+        gamma = 1.0 + 0.8 * ((mean_light - 165) / 90)
+    else:
+        gamma = 1.0
+    if gamma != 1.0:
+        lut = np.array([((i / 255) ** gamma) * 255 for i in range(256)], dtype=np.uint8)
+        adjusted = cv2.LUT(adjusted, lut)
+    if mean_light < 60 or aggressive:
+        adjusted = cv2.medianBlur(adjusted, 3)
+    clip_limit = 2.8 if aggressive or mean_light < 75 else 2.0
+    adjusted = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8, 8)).apply(adjusted)
+    return cv2.cvtColor(cv2.merge([adjusted, a, b]), cv2.COLOR_LAB2BGR), scale
 
 
 def perceptual_hash(image) -> str:
@@ -53,7 +124,7 @@ def environment_quality(image: np.ndarray, config: dict) -> dict:
 
 
 class OpenCVVision:
-    """Construct and use only inside the dedicated worker thread."""
+    """NanoDet and InsightFace adapter, owned by the dedicated worker thread."""
 
     def __init__(self, config: dict):
         self.cfg = config
@@ -62,9 +133,25 @@ class OpenCVVision:
             path = ROOT / "models" / artifact["file"]
             if (
                 not path.is_file()
+                or (
+                    "size" in artifact
+                    and path.stat().st_size != artifact["size"]
+                )
                 or hashlib.sha256(path.read_bytes()).hexdigest() != artifact["sha256"]
             ):
                 raise ValueError("MODEL_MISSING_OR_HASH_MISMATCH")
+        try:
+            from insightface.app import FaceAnalysis
+            from insightface.app.common import Face
+            import onnxruntime
+        except ImportError as exc:
+            raise RuntimeError("INSIGHTFACE_DEPENDENCIES_MISSING") from exc
+
+        providers = (
+            ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            if "CUDAExecutionProvider" in onnxruntime.get_available_providers()
+            else ["CPUExecutionProvider"]
+        )
         files = {a["name"]: str(ROOT / "models" / a["file"]) for a in manifest["artifacts"]}
         spec = importlib.util.spec_from_file_location(
             "sss_nanodet", ROOT / "models/vendor/nanodet.py"
@@ -76,10 +163,18 @@ class OpenCVVision:
         self.person_detector = module.NanoDet(
             files["nanodet"], v["person_confidence"], v["person_nms"]
         )
-        self.face_detector = cv2.FaceDetectorYN.create(
-            files["yunet"], "", (640, 480), v["face_confidence"], v["face_nms"]
+        self.face_analysis = FaceAnalysis(
+            name="buffalo_l",
+            root=str(ROOT),
+            allowed_modules=["detection", "recognition"],
+            providers=providers,
         )
-        self.recognizer = cv2.FaceRecognizerSF.create(files["sface"], "")
+        self.face_analysis.prepare(
+            ctx_id=0 if providers[0] == "CUDAExecutionProvider" else -1, det_size=(640, 640)
+        )
+        self.face_analysis.models["detection"].det_thresh = v["face_confidence"]
+        self.face_analysis.models["detection"].nms_thresh = v["face_nms"]
+        self.face_type = Face
         self.dimension = manifest["embedding_dimension"]
         self.tracker = ConservativeTracker(config)
         self.last_environment = None
@@ -119,14 +214,42 @@ class OpenCVVision:
 
     def faces(self, image):
         started = time.perf_counter()
-        h, w = image.shape[:2]
-        self.face_detector.setInputSize((w, h))
-        _, faces = self.face_detector.detect(image)
+        prepared, scale = preprocess_image(image)
+        detector = self.face_analysis.models["detection"]
+        boxes, landmarks = detector.detect(prepared, max_num=0, metric="default")
+        if boxes is None or len(boxes) == 0:
+            brightness = float(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).mean())
+            if brightness < 85 or brightness > 165:
+                prepared, scale = preprocess_image(image, aggressive=True)
+                boxes, landmarks = detector.detect(prepared, max_num=0, metric="default")
+        records = []
+        if boxes is None:
+            boxes, landmarks = [], []
+        elif landmarks is None:
+            landmarks = [None] * len(boxes)
+        for model_box, model_points in zip(boxes, landmarks, strict=True):
+            model_box = np.asarray(model_box, dtype=np.float32).copy()
+            box = model_box.copy()
+            box[:4] /= scale
+            if model_points is not None:
+                model_points = np.asarray(model_points, dtype=np.float32).reshape(5, 2)
+                points = (model_points / scale).reshape(-1)
+            else:
+                model_points = None
+                points = np.full(10, np.nan, dtype=np.float32)
+            values = np.concatenate(
+                ([box[0], box[1], box[2] - box[0], box[3] - box[1]], points)
+            ).astype(np.float32)
+            source = self.face_type(
+                bbox=model_box,
+                kps=model_points,
+            )
+            records.append(FaceRecord(values, source, prepared))
         if hasattr(self, "last_timings"):
             self.last_timings["face_detection_ms"] = round(
                 (time.perf_counter() - started) * 1000, 2
             )
-        return [] if faces is None else list(faces)
+        return records
 
     def quality(self, image, face, enrollment: bool = False):
         v = self.cfg["vision"]
@@ -154,13 +277,39 @@ class OpenCVVision:
             return None, {"reason": "FACE_BLURRED", "blur": blur}
         if clipped > v["clipped_fraction_max"]:
             return None, {"reason": "FACE_EXPOSURE", "clipped": clipped}
-        aligned = self.recognizer.alignCrop(image, np.asarray(face, np.float32))
-        return aligned, {
+        if face.model_image is None:
+            return None, {"reason": "FACE_IMAGE_UNAVAILABLE"}
+        started = time.perf_counter()
+        self.face_analysis.models["recognition"].get(face.model_image, face.source)
+        face.embedding = np.asarray(
+            face.source.normed_embedding, dtype=np.float32
+        ).reshape(-1)
+        if hasattr(self, "last_timings"):
+            self.last_timings["embedding_ms"] = round(
+                self.last_timings.get("embedding_ms", 0)
+                + (time.perf_counter() - started) * 1000,
+                2,
+            )
+        if (
+            face.embedding.size != self.dimension
+            or not np.isfinite(face.embedding).all()
+            or np.linalg.norm(face.embedding) < 1e-8
+        ):
+            return None, {"reason": "EMBEDDING_INVALID"}
+        from insightface.utils import face_align
+
+        face.aligned = face_align.norm_crop(
+            face.model_image,
+            landmark=np.asarray(face.source.kps, dtype=np.float32),
+            image_size=112,
+            mode="arcface",
+        )
+        return face, {
             "reason": None,
             "blur": blur,
             "clipped": clipped,
             "min_side_px": min(w, h),
-            "perceptual_hash": perceptual_hash(aligned),
+            "perceptual_hash": perceptual_hash(face.aligned),
             "pose_signature": [
                 float(
                     (landmarks[2, 0] - np.mean(landmarks[:2, 0]))
@@ -172,9 +321,11 @@ class OpenCVVision:
             ],
         }
 
-    def feature(self, aligned) -> np.ndarray:
+    def feature(self, face: FaceRecord) -> np.ndarray:
         started = time.perf_counter()
-        result = normalize(self.recognizer.feature(aligned).copy())
+        if face.embedding is None:
+            raise ValueError("EMBEDDING_NOT_COMPUTED")
+        result = normalize(face.embedding.copy())
         if result.size != self.dimension:
             raise ValueError("EMBEDDING_DIMENSION_CHANGED")
         if hasattr(self, "last_timings"):

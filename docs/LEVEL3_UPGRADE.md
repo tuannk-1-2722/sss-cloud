@@ -20,7 +20,7 @@ Trang 53 tóm tắt toàn bộ 6 level; diễn giải ở trên cố ý giữ đ
 ## 2. Baseline thực tế đọc từ ZIP
 
 - `firmware/security_node/security_node.ino`: AI-Thinker ESP32-CAM, OV2640, PIR GPIO13, còi GPIO14, JPEG VGA, `fb_count=1`, upload HTTP trong LAN. Có heartbeat/sync, ACK, watchdog cho còi. **Chưa điều khiển đèn đêm**, chưa có mã cloud.
-- `backend/security_app/vision.py`: NanoDet → YuNet → quality khuôn mặt → SFace → matching/tracking; AI chạy trong worker trên laptop. `models/manifest.json` ghim weight SHA256, weights không kèm ZIP.
+- `backend/security_app/vision.py`: NanoDet person detector → InsightFace buffalo_l SCRFD/ArcFace → quality/matching/tracking. Embedding chỉ được trích sau zone/quality gate; model hashes và dimension nằm trong manifest.
 - `backend/security_app/service.py`, `policy.py`: state/mode/lease, tiếp cận vùng A→B, `KNOWN`/`UNKNOWN`/`UNCERTAIN`, xác nhận nhiều frame, lưu event và lệnh còi sau COMMIT.
 - `storage.py`, `migrations/001_initial.sql`: SQLite local, vector khuôn mặt local, media và outbox.
 - `notifications.py`: đã hỗ trợ ảnh Telegram và text, **mặc định tắt**. Nhận định trước đây trong bản phân tích cũ rằng hiện chỉ là text chưa hoàn toàn chính xác với mã hiện tại.
@@ -34,7 +34,7 @@ Trang 53 tóm tắt toàn bộ 6 level; diễn giải ở trên cố ý giữ đ
 **A — Local demo đáng tin cậy (mặc định):**
 
 ```text
-ESP32-CAM + PIR → LAN → Laptop FastAPI → local NanoDet/YuNet/SFace
+ESP32-CAM + PIR → LAN → Laptop FastAPI → local NanoDet/InsightFace buffalo_l
                                     → Policy + SQLite local + buzzer command
                                     → Telegram photo + HTTPS View Live link
                                     → PWA + MJPEG via Tailscale Serve (private)
@@ -49,7 +49,7 @@ ESP32-CAM (1 monitoring node)
       ↓ JPEG + PIR/control telemetry (LAN)
 Laptop gateway (local auth + buffer + safety/command + SQLite)
       ↓ HTTPS authenticated, explicit consent
-Cloud FastAPI + OpenCV models (NanoDet/YuNet/SFace)
+Cloud FastAPI + NanoDet/InsightFace buffalo_l models
       ↓ observations/quality ← return to gateway policy
       ├── cloud SQLite event metadata (MOUNT persistent volume)
       └── cloud web dashboard: count by severity/reason/day
@@ -143,7 +143,7 @@ Dùng **hai process/host độc lập**:
 uvicorn security_app.cloud_service:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
-Cloud reverse proxy HTTPS phía trước, **không** trưng API token hay mở cloud inference không xác thực. `GET /health/ready` với bearer phải trả `ready: true`. `GET /` phải yêu cầu Basic authentication và hiển thị dashboard cloud. Cloud cần cài weights bằng `python -m tools.download_models`.
+Cloud reverse proxy HTTPS phía trước, **không** trưng API token hay mở cloud inference không xác thực. `GET /health/ready` với bearer phải trả `ready: true`. `GET /` phải yêu cầu Basic authentication và hiển thị dashboard cloud. Chuyển riêng hai ONNX InsightFace đã kiểm hash vào `models/buffalo_l/`, không chuyển ZIP có thể chứa ảnh/cache; sau đó chạy `python -m tools.download_models` để xác minh weights và tải artifact còn lại.
 
 **Gateway laptop**: giữ `SSS_CONFIG` hardware đã hiệu chỉnh; trong YAML:
 

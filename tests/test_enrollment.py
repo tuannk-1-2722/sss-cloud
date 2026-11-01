@@ -6,6 +6,11 @@ from security_app.contracts import FrameMeta
 from security_app.service import DomainError, Packet
 
 
+def synthetic_vector(service, index=0):
+    dimension = service.store.manifest["embedding_dimension"]
+    return np.eye(1, dimension, index, dtype=np.float32).reshape(-1)
+
+
 def begin(service):
     # Exercise orchestration with synthetic vectors, not real vision/accuracy.
     service.cfg["profile"] = "hardware"
@@ -25,7 +30,7 @@ def begin(service):
 
 def add(service, packet, index, monkeypatch, vector=None):
     monkeypatch.setattr("security_app.service.clock_ms", lambda: (index + 1) * 1000)
-    vector = vector if vector is not None else np.eye(1, 128, 1, dtype=np.float32).reshape(-1)
+    vector = vector if vector is not None else synthetic_vector(service, 1)
     quality = {
         "reason": "OK",
         "perceptual_hash": hashlib.sha256(str(index).encode()).hexdigest()[:16],
@@ -61,9 +66,9 @@ def test_duplicate_hash_and_conflicting_identity_are_rejected(service, monkeypat
     add(service, packet, 0, monkeypatch)  # Spacing guard first; then duplicate guard.
     monkeypatch.setattr("security_app.service.clock_ms", lambda: 3000)
     quality = {"reason": "OK", "perceptual_hash": hashlib.sha256(b"0").hexdigest()[:16]}
-    service._enrollment_result(packet, np.eye(1, 128, 1, dtype=np.float32).reshape(-1), quality)
+    service._enrollment_result(packet, synthetic_vector(service, 1), quality)
     assert service.capture_session["last_feedback"] == "SAMPLE_TOO_SIMILAR_CHANGE_POSE"
-    add(service, packet, 3, monkeypatch, np.eye(1, 128, 2, dtype=np.float32).reshape(-1))
+    add(service, packet, 3, monkeypatch, synthetic_vector(service, 2))
     assert service.capture_session["last_feedback"] == "SAMPLE_IDENTITY_CONFLICT_RESTART_OR_REVIEW"
     assert service.capture_session["accepted"] == [1, 0]
 

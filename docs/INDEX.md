@@ -57,8 +57,8 @@ regression mới phải giữ (6.1), giới hạn công cụ (6.2), giới hạn
 **Bắt buộc đọc** khi làm G2/G3/G4, HIL, calibration hoặc chuẩn bị demo.
 
 ### `docs/RESEARCH.md` — Nguồn kỹ thuật
-Các nguồn R01–R11 (esp32-camera, GPIO, PIR, OpenCV Zoo, SFace, Arduino CLI, FastAPI,
-SQLite, Telegram Bot), lý do giữ kiến trúc, artifacts/license đã ghim, đối chiếu
+Các nguồn R01–R12 (esp32-camera, GPIO, PIR, OpenCV Zoo, InsightFace, Arduino CLI,
+FastAPI, SQLite, Telegram Bot), lý do giữ kiến trúc, artifacts/license đã ghim, đối chiếu
 bổ sung khi review.
 **Chỉ đọc** khi cần xác minh một quyết định kỹ thuật, model hay dependency cụ thể.
 

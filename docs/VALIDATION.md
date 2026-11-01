@@ -149,7 +149,7 @@ Khung hồ sơ (placeholder phải thay bằng bằng chứng thật):
 {
   "calibration_id":"camera-v1-reviewed-YYYYMMDD",
   "state":"validated",
-  "model_set_id":"opencv-zoo-cpu-v1",
+  "model_set_id":"nanodet-insightface-buffalo-l-v1",
   "camera_profile_hash":"FROM-DOCTOR",
   "model_manifest_sha256":"FROM-CALIBRATION-CHECK",
   "validated_gallery_limit":5,

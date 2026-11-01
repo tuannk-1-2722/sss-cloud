@@ -204,12 +204,17 @@ python3.12 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python -m pip install -e .
-.venv/bin/python -m tools.download_models
 ```
 
 Đối chiếu SHA256 archive với Windows. Nếu đã có deployment trong thư mục, không extract đè khi service đang chạy; dừng và chuẩn bị thư mục release mới.
 
-Giữ nguyên package pin trong repo. Nếu wheel cho kiến trúc máy thiếu hoặc package/model download lỗi, lưu tên package/lỗi để xử lý đúng; chưa tiếp tục đưa dữ liệu thật vào. Không tải model mới thay cho weights đã ghim.
+Trên máy Windows tin cậy, chạy `tools.download_models --insightface-archive "C:\path\to\smart_security_module.zip"` để chỉ trích xuất và kiểm SHA256 hai file ONNX cần thiết. Chuyển **chỉ** `models/buffalo_l/det_10g.onnx` và `models/buffalo_l/w600k_r50.onnx` lên VM vào cùng đường dẫn; không chuyển ZIP vì nó có thể chứa ảnh/cache sinh trắc. Sau đó chạy trên VM:
+
+```bash
+.venv/bin/python -m tools.download_models
+```
+
+Lệnh trên VM xác minh hai file đó và tải NanoDet/wrapper đã ghim. Giữ ZIP ngoài repo và không đưa ảnh, cache, runtime hay gallery lên VM. Giữ nguyên package pin trong repo. Nếu wheel cho kiến trúc máy thiếu hoặc package/model download lỗi, lưu tên package/lỗi để xử lý đúng; chưa tiếp tục đưa dữ liệu thật vào. Không tải model mới thay cho weights đã ghim.
 
 ## 6. Cấu hình runtime riêng trên VM
 
@@ -253,7 +258,7 @@ export SSS_DASHBOARD_URL=https://YOUR_HOSTNAME
 
 Bootstrap hỏi mật khẩu admin tối thiểu 12 ký tự. Dùng mật khẩu riêng, lưu vào password manager. Lệnh tạo credential và token mới cho cloud; token nằm trong `~/sss-private/runtime-hardware/device-token.txt`, không in ra log.
 
-`models-smoke` cần PASS, dimension 128. `calibration-check` ban đầu trả `CALIBRATION_REQUIRED` là đúng, vì chưa có hồ sơ thực. Chưa thể arm nhưng vẫn tiếp tục setup server, kết nối board, preview và enrollment draft.
+`models-smoke` cần PASS, dimension 512. Khi thay model, vô hiệu hóa người đang active, thu enrollment lại cho toàn bộ người cần giữ, rồi mới activate họ; không trộn embedding 128 chiều cũ với 512 chiều mới. `calibration-check` ban đầu trả `CALIBRATION_REQUIRED` là đúng, vì model mới làm calibration cũ không còn hợp lệ. Chưa thể arm cho đến khi thu enrollment lại và có calibration/validation report cho model mới; có thể tiếp tục setup server, kết nối board, preview và enrollment draft.
 
 Ghi nhớ: khi chạy full app trên cloud, biến consent của remote adapter không tự bảo vệ luồng này. Nhóm cần quyết định quyền xử lý/lưu gallery trước khi đăng ký người; không copy runtime/gallery từ laptop theo mặc định.
 

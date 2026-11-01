@@ -33,7 +33,7 @@ class BlockingVision:
 
     def enrollment_sample(self, _):
         self.analyze()
-        return np.eye(1, 128, 1, dtype=np.float32).reshape(-1), {
+        return np.eye(1, 512, 1, dtype=np.float32).reshape(-1), {
             "reason": None,
             "perceptual_hash": "0123456789abcdef",
         }

@@ -15,6 +15,7 @@ configs/local.yaml
 configs/calibration.local.json
 firmware/security_node/secrets.h
 models/*.onnx
+models/**/*.onnx
 models/**/*.part
 *.sqlite3*
 *.db*

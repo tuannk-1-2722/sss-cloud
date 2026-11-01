@@ -776,7 +776,7 @@ class SecurityService:
                 {
                     "frame_id": packet.frame_id,
                     "gallery_revision": self.gallery_revision,
-                    "model_set_id": "opencv-zoo-cpu-v1",
+                    "model_set_id": self.store.manifest["model_set_id"],
                     "calibration_id": self.calibration.get("calibration_id"),
                     "mode_revision": self.mode_revision,
                 }

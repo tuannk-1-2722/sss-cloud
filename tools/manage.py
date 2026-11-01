@@ -81,11 +81,34 @@ def main():
         )
         return
     if args.command == "models-smoke":
-        from security_app.vision import OpenCVVision
+        from security_app.vision import FaceRecord, OpenCVVision
 
         vision = OpenCVVision(cfg)
         persons, faces = vision.detections(np.zeros((480, 640, 3), np.uint8))
-        feature = vision.feature(np.zeros((112, 112, 3), np.uint8))
+        landmarks = np.array(
+            [
+                [38.2946, 51.6963],
+                [73.5318, 51.5014],
+                [56.0252, 71.7366],
+                [41.5493, 92.3655],
+                [70.7299, 92.2041],
+            ],
+            dtype=np.float32,
+        )
+        face = vision.face_type(
+            bbox=np.array([0, 0, 112, 112, 1], dtype=np.float32),
+            kps=landmarks,
+        )
+        vision.face_analysis.models["recognition"].get(
+            np.zeros((112, 112, 3), np.uint8), face
+        )
+        feature = vision.feature(
+            FaceRecord(
+                values=np.zeros(14, dtype=np.float32),
+                source=face,
+                embedding=np.asarray(face.normed_embedding, dtype=np.float32),
+            )
+        )
         print(
             json.dumps(
                 {
@@ -180,7 +203,8 @@ def main():
             manifest = json.loads((ROOT / "models/manifest.json").read_text())
             for i, name in enumerate(("SIM - Người quen A", "SIM - Người quen B")):
                 pid = store.create_person(name)
-                vector = np.eye(1, 128, i, dtype=np.float32).reshape(-1)
+                dimension = manifest["embedding_dimension"]
+                vector = np.eye(1, dimension, i, dtype=np.float32).reshape(-1)
                 with store.connection() as db:
                     for j in range(5):
                         db.execute(
@@ -189,7 +213,7 @@ def main():
                                 str(uuid4()),
                                 pid,
                                 vector.tobytes(),
-                                128,
+                                dimension,
                                 f"{j:016x}",
                                 "{}",
                                 1,

@@ -125,6 +125,27 @@ def test_cloud_analytics_auth_storage_and_stats(tmp_path, monkeypatch):
         assert result.status_code == 200
         assert result.json()["feature"] is None
         assert result.json()["environment"]["reason"] == "SCENE_TOO_DARK"
+        vector = np.eye(1, 512, dtype=np.float32).reshape(-1)
+        monitoring = {
+            "purpose": "monitoring",
+            "jpeg": base64.b64encode(small_jpeg).decode(),
+            "gallery": {"person-1": [base64.b64encode(vector.tobytes()).decode()]},
+        }
+        response = client.post(
+            "/v1/infer",
+            headers={"Authorization": f"******"},
+            json=monitoring,
+        )
+        assert response.status_code == 200
+        monitoring["gallery"]["person-1"] = [
+            base64.b64encode(np.eye(1, 128, dtype=np.float32).tobytes()).decode()
+        ]
+        response = client.post(
+            "/v1/infer",
+            headers={"Authorization": f"******"},
+            json=monitoring,
+        )
+        assert response.status_code == 422
 
 
 def test_cloud_bridge_is_metadata_only_and_marks_outbox_sent(service, monkeypatch):

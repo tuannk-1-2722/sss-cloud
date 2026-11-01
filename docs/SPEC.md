@@ -73,9 +73,9 @@ Với vị trí camera mà center A/B không tách được hoặc thường m�
 
 ## 4. Danh tính và xác nhận
 
-**FR-10 — Model:** NanoDet ONNX person + YuNet face + SFace feature, CPU; artifact/wrapper/license ở exact commit và SHA256 trong manifest. BGR, person letterbox 416×416 rồi đưa bbox về ảnh gốc; YuNet input size đúng ảnh gốc; SFace `alignCrop` từ 5 landmark. Normalize L2 vector float32, output dimension đúng manifest.
+**FR-10 — Model:** NanoDet ONNX person + InsightFace buffalo_l SCRFD face detector và ArcFace recognizer; artifact/hash và embedding dimension ở manifest. BGR, person letterbox 416×416 rồi đưa bbox về ảnh gốc. InsightFace dùng adaptive-light preprocessing trước khi dò mặt; mọi bbox/landmark phải quy về ảnh camera gốc trước geometry/quality. Chỉ trích embedding sau zone B và quality gate; normalize L2 float32, dimension 512 theo manifest.
 
-YuNet chạy độc lập person detector. Gán mặt vào phần trên body khi có đúng một candidate hợp lý; nhiều candidates hoặc nhiều mặt trên body → uncertain. Không thấy mặt → NO_FACE, không UNKNOWN. Face confidence, min size, landmark, blur trên crop 112×112, clipped pixels là quality gate. Không ước lượng yaw chính xác bằng một heuristic chưa đo.
+Face detector chạy độc lập person detector. Gán mặt vào phần trên body khi có đúng một candidate hợp lý; nhiều candidates hoặc nhiều mặt trên body → uncertain. Không thấy mặt → NO_FACE, không UNKNOWN. Face confidence, min size, landmark, blur trên crop 112×112, clipped pixels là quality gate. Không ước lượng yaw chính xác bằng một heuristic chưa đo.
 
 **FR-11 — Open set:** với query q và samples g của mỗi người i:
 
@@ -97,7 +97,7 @@ Gallery rỗng hoặc model/calibration lỗi chặn arm; không gọi mọi ng�
 
 **FR-13 — Workflow:** admin + consent → person draft → DISARMED → enrollment lease, STOP → hai lượt → commit → DISARMED. Người active phải disable trước reenroll; chỉ một capture session. Có thể thu draft trước calibration để tránh vòng phụ thuộc cần gallery mới hiệu chỉnh được.
 
-Enrollment chạy YuNet/quality/SFace trên một JPEG mới nhất mỗi lịch (mốc thử1s),
+Enrollment chạy InsightFace/quality trên một JPEG mới nhất mỗi lịch (mốc thử1s),
 không chạy NanoDet hay yêu cầu vùng B của giám sát. Cần đúng một face, tâm trong
 ellipse face_region, quality cao hơn recognition. Không thêm ảnh nhiều mặt.
 Hidden/pause/đủ lượt dừng extraction nhưng không ngắt video nếu còn quyền xem.

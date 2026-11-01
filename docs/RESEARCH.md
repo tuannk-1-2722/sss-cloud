@@ -9,14 +9,15 @@
 | R01 | [Espressif esp32-camera](https://github.com/espressif/esp32-camera) | JPEG phù hợp khi có Wi-Fi; PSRAM quan trọng khi tăng kích thước ảnh; nhiều framebuffer đổi cách capture | AI-Thinker có PSRAM, VGA JPEG, một framebuffer để đơn giản ownership; đo age/heap/cadence thực |
 | R02 | [Pin map CameraWebServer, core 3.3.0](https://github.com/espressif/arduino-esp32/blob/3.3.0/libraries/ESP32/examples/Camera/CameraWebServer/camera_pins.h), [ESP32 GPIO](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/gpio.html) | Camera pin map phụ thuộc board; strapping/input-only/flash-PSRAM có hạn chế | GPIO13 PIR, GPIO14 driver buzzer; không SD; xác minh board thật và logic level trước đấu |
 | R03 | [Adafruit PIR overview](https://learn.adafruit.com/pir-passive-infrared-proximity-motion-sensor/overview) | PIR phát hiện thay đổi hồng ngoại do chuyển động | Chỉ kích burst capture; không suy khoảng cách, danh tính hoặc chiều từ PIR |
-| R04 | [OpenCV 4.13 face detection/recognition tutorial](https://docs.opencv.org/4.13.0/d0/dd4/tutorial_dnn_face.html) | YuNet/SFace API: landmarks → alignCrop → feature → cosine comparison; có benchmark/ngưỡng theo benchmark | Dùng API CPU có sẵn; L2 normalize, gallery cosine; không áp threshold benchmark như bảo đảm cho ESP32-CAM |
+| R04 | [OpenCV 4.13 face detection/recognition tutorial](https://docs.opencv.org/4.13.0/d0/dd4/tutorial_dnn_face.html) | YuNet/SFace API: landmarks → alignCrop → feature → cosine comparison; có benchmark/ngưỡng theo benchmark | Tham chiếu baseline v2.1 trước khi chuyển model; không còn là face pipeline active |
 | R05 | [OpenCV Zoo tại commit ghim](https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98), [NanoDet wrapper](https://github.com/opencv/opencv_zoo/blob/47534e27c9851bb1128ccc0102f1145e27f23f98/models/object_detection_nanodet/nanodet.py) | Model artifacts và tiền xử lý/postprocess NanoDet chính thức | Ghim wrapper + weight + hash; letterbox416 trả bbox về ảnh gốc; chỉ class person |
-| R06 | [SFace tác giả](https://github.com/zhongyy/SFace), [Zoo SFace artifact](https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface) | Nhận diện bằng pretrained features; bản Zoo đóng gói ONNX | Enrollment thêm gallery, không train lại model; score không là xác suất; validation riêng mới chọn accept/reject/margin |
+| R06 | [SFace tác giả](https://github.com/zhongyy/SFace), [Zoo SFace artifact](https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface) | Face recognizer pretrained của baseline v2.1 | Lưu làm lịch sử; không dùng trong pipeline hiện tại |
 | R07 | [Arduino-ESP32 installation](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html), [core releases](https://github.com/espressif/arduino-esp32/releases) | Nền tảng ESP32 cài qua package index; phiên bản ảnh hưởng build/API | Core ghim 3.3.0 làm baseline đã chọn, không tuyên bố là latest |
 | R08 | [Arduino CLI sketch profiles](https://docs.arduino.cc/arduino-cli/sketch-project-file/), [ArduinoJson v7](https://arduinojson.org/v7/) | Profile ghim FQBN/platform/library; JsonDocument v7 có API tương ứng | CLI1.2.2 + core3.3.0 + ArduinoJson7.4.1 trong sketch.yaml; full compile phải được nhóm kiểm |
 | R09 | [FastAPI async/concurrency](https://fastapi.tiangolo.com/async/) | Async phù hợp I/O; việc CPU cần cách chạy phù hợp | Một worker vision riêng, API/control không chờ inference; native inference có thể kẹt nên health/reset và process restart có giới hạn |
 | R10 | [SQLite WAL](https://www.sqlite.org/wal.html), [SQLite backup API](https://www.sqlite.org/backup.html) | WAL dùng shared-memory/local host; backup API tạo snapshot nhất quán | SQLite local trên máy server, không DB đặt network drive; backup khi stopped + media/checksums |
 | R11 | [Telegram Bot API](https://core.telegram.org/bots/api) | sendMessage/error responses và retry_after khi giới hạn | Extension text outbox tắt mặc định; retries có trần, không hứa exactly-once sau timeout |
+| R12 | InsightFace buffalo_l artifacts trong archive do nhóm cung cấp | SCRFD detector + ArcFace recognizer; manifest khóa SHA256 của `det_10g.onnx` và `w600k_r50.onnx` | Adapter chỉ chạy detector trước; recognition chỉ sau zone/quality gate. Archive không kèm terms sử dụng model; xác minh terms trước khi phân phối hoặc dùng ngoài phạm vi được phép |
 
 Quy tắc A → B, tâm body bbox, stability/votes/freshness, warning không đủ mặt/chiều và suppression per-visit là **thiết kế của dự án**, không kết luận trực tiếp từ các nguồn trên. Nó giúp demo đường đi kiểm soát nhưng có thể bỏ/nhầm chiều khi tracking mất, góc camera xấu hoặc người che nhau; cần evidence G2/G4.
 
@@ -35,13 +36,13 @@ R01 còn có [`camera_fb_t.timestamp`](https://github.com/espressif/esp32-camera
 
 ## 3. Artifacts và license đã ghim
 
-`models/manifest.json` sở hữu URL/commit/size/SHA256; tool tải kiểm cả weight, wrapper và license. Total weights khoảng 42,7 MB theo byte manifest; không kèm ONNX trong ZIP. Không tự đổi sang file cùng tên từ mirror khác.
+`models/manifest.json` sở hữu provenance/size/SHA256. NanoDet tải từ OpenCV Zoo; InsightFace buffalo_l weights lấy từ archive do nhóm cung cấp. Không commit hoặc phân phối ONNX và không đưa toàn archive lên VM vì archive có thể chứa dữ liệu sinh trắc.
 
 | Thành phần | Artifact | License tại commit ghim |
 |---|---|---|
 | NanoDet | `object_detection_nanodet_2022nov.onnx` + official wrapper | Apache-2.0 |
-| YuNet | `face_detection_yunet_2023mar.onnx` | MIT |
-| SFace | `face_recognition_sface_2021dec.onnx` | Apache-2.0 |
+| InsightFace buffalo_l detector | `buffalo_l/det_10g.onnx` | Terms sử dụng model chưa được xác minh; xem R12 |
+| InsightFace buffalo_l recognizer | `buffalo_l/w600k_r50.onnx` | Terms sử dụng model chưa được xác minh; xem R12 |
 
 Giữ license texts trong `models/licenses/`, notices trong `THIRD_PARTY.md`, và nguồn trong manifest khi chia sẻ model/wrapper. License của dependency Python/Arduino theo package upstream, không được ghi tất cả là một license của ứng dụng. Nhóm chọn license cho phần code của mình khi tạo repo, phù hợp yêu cầu lớp.
 

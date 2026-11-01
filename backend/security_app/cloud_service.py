@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import html
 import io
+import json
 import os
 import secrets
 import sqlite3
@@ -27,7 +28,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field
 
-from .config import load_config
+from .config import ROOT, load_config
 from .runtime import clock_ms
 
 
@@ -64,6 +65,10 @@ def create_cloud_app(*, db_path=None, token=None, vision_factory=None) -> FastAP
     if len(api_token) < 32:
         raise ValueError("SSS_CLOUD_API_TOKEN must be >=32 chars")
     database_path = Path(db_path or os.environ.get("SSS_CLOUD_DB", "runtime/cloud/events.sqlite3"))
+    embedding_dimension = json.loads((ROOT / "models/manifest.json").read_text())[
+        "embedding_dimension"
+    ]
+    max_encoded_vector = 4 * ((embedding_dimension * 4 + 2) // 3)
     admin_user = os.environ.get("SSS_CLOUD_VIEW_USER", "")
     admin_password = os.environ.get("SSS_CLOUD_VIEW_PASSWORD", "")
     basic = HTTPBasic(auto_error=False)
@@ -166,12 +171,12 @@ def create_cloud_app(*, db_path=None, token=None, vision_factory=None) -> FastAP
                     raise ValueError("PERSON_ID_TOO_LONG")
                 vectors[person_id] = []
                 for item in encoded:
-                    if len(item) > 1024:
+                    if len(item) > max_encoded_vector:
                         raise ValueError("INVALID_VECTOR_LENGTH")
                     vector = np.frombuffer(
                         base64.b64decode(item, validate=True), dtype="<f4"
                     ).copy()
-                    if vector.size != 128 or not np.isfinite(vector).all():
+                    if vector.size != embedding_dimension or not np.isfinite(vector).all():
                         raise ValueError("INVALID_VECTOR")
                     vectors[person_id].append(vector)
         except (ValueError, TypeError) as exc:

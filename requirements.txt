@@ -48,6 +48,10 @@ numpy==2.2.6
     #   opencv-python-headless
 opencv-python-headless==4.13.0.92
     # via -r smart-security-system-v2/requirements.in
+insightface==0.7.3
+    # via -r smart-security-system-v2/requirements.in
+onnxruntime==1.22.1
+    # via -r smart-security-system-v2/requirements.in
 opentelemetry-api==1.45.0
     # via fastapi
 pillow==12.3.0

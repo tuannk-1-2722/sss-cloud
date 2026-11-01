@@ -1,7 +1,8 @@
+import numpy as np
 import pytest
 from security_app.config import validate_config
 from security_app.matching import match, normalize
-from security_app.vision import ConservativeTracker
+from security_app.vision import ConservativeTracker, FaceRecord, OpenCVVision, preprocess_image
 
 
 def test_empty_gallery_does_not_call_everyone_unknown(cfg):
@@ -38,3 +39,51 @@ def test_invalid_configuration_fails_before_run(cfg):
     cfg["zones"]["doorstep"] = cfg["zones"]["approach"]
     with pytest.raises(ValueError):
         validate_config(cfg)
+
+
+def test_ai_preprocessor_preserves_only_actual_resize_scale():
+    image = np.full((240, 320, 3), 96, dtype=np.uint8)
+    processed, scale = preprocess_image(image)
+    assert processed.shape == (360, 480, 3)
+    assert scale == 1.5
+
+
+def test_insightface_embedding_fits_gallery_contract():
+    vision = OpenCVVision.__new__(OpenCVVision)
+    vision.dimension = 512
+    vision.last_timings = {}
+    embedding = np.eye(1, 512, dtype=np.float32).reshape(-1)
+    vector = vision.feature(
+        FaceRecord(values=np.zeros(14, dtype=np.float32), source=None, embedding=embedding)
+    )
+    assert vector.shape == (512,)
+    assert np.isclose(np.linalg.norm(vector), 1)
+
+
+def test_face_detector_does_not_compute_embedding_before_zone_policy(monkeypatch, cfg):
+    class Detector:
+        def detect(self, *_args, **_kwargs):
+            return (
+                np.array([[100, 100, 180, 180, 0.99]], dtype=np.float32),
+                np.array([[[120, 130], [160, 130], [140, 150], [125, 165], [155, 165]]]),
+            )
+
+    class Recognition:
+        def get(self, *_args):
+            raise AssertionError("Recognition runs only after zone and quality checks")
+
+    class Face:
+        def __init__(self, **values):
+            self.__dict__.update(values)
+
+    vision = OpenCVVision.__new__(OpenCVVision)
+    vision.face_analysis = type(
+        "FaceAnalysisDouble",
+        (),
+        {"models": {"detection": Detector(), "recognition": Recognition()}},
+    )()
+    vision.face_type = Face
+    vision.last_timings = {}
+    records = vision.faces(np.full((480, 640, 3), 128, dtype=np.uint8))
+    assert len(records) == 1
+    assert records[0].embedding is None

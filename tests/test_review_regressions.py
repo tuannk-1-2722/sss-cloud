@@ -136,7 +136,7 @@ def fake_vision(cfg, persons, faces):
     v.detections = lambda _: (persons, faces)
     v.faces = lambda _: faces
     v.quality = lambda *_args, **_kwargs: (np.zeros((112, 112, 3), np.uint8), {"reason": None})
-    v.feature = lambda _: np.eye(1, 128, dtype=np.float32).reshape(-1)
+    v.feature = lambda _: np.eye(1, 512, dtype=np.float32).reshape(-1)
     return v
 
 

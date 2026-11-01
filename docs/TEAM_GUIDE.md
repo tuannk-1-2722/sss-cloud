@@ -176,9 +176,9 @@ Mỗi mặt đạt được căn chỉnh rồi chuyển thành vector embedding.
 | Bước | Mô hình/logic | Kết quả |
 |---|---|---|
 | Tìm người | NanoDet ONNX, CPU | Bbox thân người, kể cả không thấy mặt |
-| Tìm mặt | YuNet | Bbox mặt + 5 landmark |
-| Kiểm và căn chỉnh mặt | Size, blur, exposure, landmark; alignCrop | Mặt đủ điều kiện hoặc lý do loại |
-| Trích đặc trưng | SFace | Vector 128 chiều với artifact hiện tại |
+| Tìm mặt | InsightFace buffalo_l / SCRFD | Bbox mặt + 5 landmark |
+| Kiểm và căn chỉnh mặt | Adaptive-light, size, blur, exposure, landmark; ArcFace alignment | Mặt đủ điều kiện hoặc lý do loại |
+| Trích đặc trưng | InsightFace buffalo_l / ArcFace | Vector 512 chiều với artifact hiện tại |
 | So khớp | Cosine với gallery | Known / unknown / uncertain |
 | Nối theo thời gian | Bbox tracking bảo thủ | Track và chuỗi A/B |
 | Quyết định | Policy theo lượt + freshness + nhiều phiếu | Info / warning / alarm |

@@ -46,6 +46,8 @@ idna==3.20
     # via
     #   anyio
     #   httpx
+insightface==0.7.3
+    # via -r requirements.in
 iniconfig==2.3.0
     # via pytest
 numpy==2.2.6
@@ -53,6 +55,8 @@ numpy==2.2.6
     #   -r smart-security-system-v2/requirements.in
     #   opencv-python-headless
 opencv-python-headless==4.13.0.92
+    # via -r requirements.in
+onnxruntime==1.22.1
     # via -r smart-security-system-v2/requirements.in
 opentelemetry-api==1.45.0
     # via fastapi
