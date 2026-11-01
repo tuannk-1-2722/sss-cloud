@@ -14,6 +14,7 @@ function part(id, age = 0, jpeg = new Uint8Array([255, 216, 255, 217]), revision
 
 function realm(withApp = false) {
   let now = 0, serial = 0, responseStatus = 200;
+  let responseMime = 'multipart/x-mixed-replace; boundary=frame';
   const timers = new Map(), requests = [], streams = [], elements = new Map(), listeners = {};
   const strokes = [];
   const context2d = new Proxy({}, {get: (_, key) => (...args) => {
@@ -81,7 +82,7 @@ function realm(withApp = false) {
         }, {once: true});
         streams.push(controller);
         return {status: code, ok: code === 200, body,
-          headers: {get: () => 'multipart/x-mixed-replace; boundary=frame'}};
+          headers: {get: () => responseMime}};
       }
       if (url.endsWith('/video/viewers')) return jsonResponse({lease_id: 'fixture-view', remaining_ms: 15000});
       if (url.endsWith('/status')) {
@@ -101,6 +102,7 @@ function realm(withApp = false) {
     setStatus: value => { status = value; }, status: () => status,
     setFailure: value => { statusFailure = value; },
     setResponse: code => { responseStatus = code; },
+    setMime: value => { responseMime = value; },
     setMutation: value => { mutationReply = value; },
     advance: async ms => {
       now += ms;
@@ -139,6 +141,29 @@ test('multipart reader bounds headers/payloads and rejects missing identity or e
 
 const videoRequests = r => r.requests.filter(x => x.url.includes('/live.mjpg'));
 const startStream = r => r.run('stream = new CameraStream({onFrame: f => seen.push(f.id), onClear: () => clears++, onState() {}, onUnauthorized: () => unauthorized++, getCsrf: () => "csrf-fixture"}); stream.start("monitor"); stream.start("monitor")');
+
+test('fetch requests raw bytes for WebKit and keeps bounded frame metadata validation', async () => {
+  const r = realm(); Object.assign(r.context, {seen: [], clears: 0, unauthorized: 0});
+  r.setMime('application/octet-stream');
+  startStream(r); await flush();
+  assert.equal(videoRequests(r)[0].headers.Accept, 'application/octet-stream');
+  r.streams[0].enqueue(part('raw-frame', 150)); await flush();
+  assert.deepEqual(Array.from(r.context.seen), ['raw-frame']);
+  r.streams[0].enqueue(part('expired-frame', 3001)); await flush();
+  assert.deepEqual(Array.from(r.context.seen), ['raw-frame']);
+  assert.ok(videoRequests(r)[0].signal.aborted || r.context.clears > 1);
+  r.run('stream.stop()');
+});
+
+test('a transformed JPEG or HTML response cannot bypass the envelope parser', async () => {
+  for (const mime of ['image/jpeg', 'text/html']) {
+    const r = realm(); Object.assign(r.context, {seen: [], clears: 0, unauthorized: 0});
+    r.setMime(mime); startStream(r); await flush();
+    assert.deepEqual(Array.from(r.context.seen), []);
+    assert.ok(r.context.clears >= 2);
+    r.run('stream.stop()');
+  }
+});
 
 test('stream creates one renewable view, renders frames, expires by age and stops without retries', async () => {
   const r = realm(); Object.assign(r.context, {seen: [], clears: 0, unauthorized: 0});

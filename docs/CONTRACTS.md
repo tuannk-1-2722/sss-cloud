@@ -223,6 +223,13 @@ xóa cache privacy; mode revision không ngắt video. Kiểm lại web session 
 mỗi giây, lease theo mỗi vòng; logout thu hồi mọi viewer của web session đó.
 Không đóng/reconnect cưỡng bức sau 30 giây. Mỗi subscriber chỉ theo ảnh mới nhất.
 
+Tương thích WebKit/iPhone: dashboard gửi `Accept: application/octet-stream` để
+nhận cùng các byte envelope/metadata/JPEG với `Content-Type: application/octet-stream`.
+JavaScript tự parse boundary `frame`; không giao multipart decoding cho browser.
+Client không yêu cầu kiểu byte này vẫn nhận `multipart/x-mixed-replace; boundary=frame`
+như trước. Cả hai dùng cùng auth, lease, freshness, viewer limit và `no-store`;
+response có `Vary: Accept`. Không đổi protocol camera hoặc tạo source ảnh thứ hai.
+
 Status thêm `video` (received_fps/viewers/demand/settings), `analysis` (enabled,
 interval_ms/effective_fps/duration_p95_ms/queue_wait_ms/stages_ms/over_budget),
 `device_telemetry` tùy chọn. Sync telemetry: control_rtt_ms, free_heap_bytes,

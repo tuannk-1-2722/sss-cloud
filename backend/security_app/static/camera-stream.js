@@ -180,12 +180,13 @@ class CameraStream {
     let reader = null, response = null, retryMs = 250;
     try {
       response = await fetch(`/api/v2/live.mjpg?lease_id=${encodeURIComponent(this.leaseId)}`, {
-        signal: controller.signal, credentials: "same-origin", cache: "no-store"
+        signal: controller.signal, credentials: "same-origin", cache: "no-store",
+        headers: {Accept: "application/octet-stream"}
       });
       if (generation !== this.generation) return;
       if (response.status === 401) { this.stop(); this.onUnauthorized(); return; }
       if (!response.ok || !response.body ||
-          !/^multipart\/x-mixed-replace\s*;\s*boundary="?frame"?\s*$/i.test(response.headers.get("Content-Type") || "")) {
+          !/^(?:application\/octet-stream|multipart\/x-mixed-replace\s*;\s*boundary="?frame"?)\s*$/i.test(response.headers.get("Content-Type") || "")) {
         retryMs = response.status === 429 ? 2000 : 1000;
         throw new Error("STREAM_UNAVAILABLE");
       }

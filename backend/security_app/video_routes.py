@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import sqlite3
 import threading
 
@@ -14,6 +15,8 @@ from .auth import digest
 from .contracts import VideoView
 from .runtime import DomainError
 from .video import unpack_video
+
+logger = logging.getLogger(__name__)
 
 
 def install_video_routes(app, service, admin):
@@ -86,16 +89,30 @@ def install_video_routes(app, service, admin):
                     s.video.listeners.pop(event, None)
                 live_slots.release()
 
+        # WebKit rejects multipart/x-mixed-replace in fetch(). The JS reader parses
+        # the same bounded envelope itself; keep native MJPEG for existing clients.
+        media = (
+            "application/octet-stream"
+            if request.headers.get("accept") == "application/octet-stream"
+            else "multipart/x-mixed-replace; boundary=frame"
+        )
         return StreamingResponse(
             frames(),
-            media_type="multipart/x-mixed-replace; boundary=frame",
-            headers={"Cache-Control": "no-store, no-transform", "X-Accel-Buffering": "no"},
+            media_type=media,
+            headers={
+                "Cache-Control": "no-store, no-transform",
+                "X-Accel-Buffering": "no",
+                "Vary": "Accept",
+            },
         )
 
     @app.websocket("/api/v2/devices/{device_id}/video")
     async def video_uplink(socket: WebSocket):
         s = socket.app.state.service
         acquired = False
+        started = last_received = s.now()
+        accepted_frames = 0
+        close_code, close_reason = 1000, "DEVICE_DISCONNECTED"
         try:
             socket.app.state.auth.device(socket)
             # Device channel has no browser-cookie authority and accepts no browser Origin.
@@ -111,25 +128,55 @@ def install_video_routes(app, service, admin):
                 async with asyncio.timeout(2):
                     message = await socket.receive()
                 if message["type"] == "websocket.disconnect":
+                    close_code = message.get("code", 1006)
                     return
                 data = message.get("bytes")
                 if data is None:
                     raise DomainError("VIDEO_BINARY_REQUIRED", 415)
                 meta, jpeg = unpack_video(data)
                 result = await run_in_threadpool(s.accept_video, meta, jpeg, s.now())
+                accepted_frames += 1
+                last_received = s.now()
                 async with asyncio.timeout(1):
                     await socket.send_json(result)
         except DomainError as exc:
             # Do not echo metadata/token or partially parsed payload.
-            await socket.close(code=1009 if exc.status == 413 else 1008, reason=exc.code)
+            close_code, close_reason = (1009 if exc.status == 413 else 1008), exc.code
+            await socket.close(code=close_code, reason=close_reason)
         except TimeoutError:
-            await socket.close(code=1008, reason="VIDEO_TIMEOUT")
+            close_code, close_reason = 1008, "VIDEO_TIMEOUT"
+            await socket.close(code=close_code, reason=close_reason)
         except (sqlite3.Error, OSError):
+            close_code, close_reason = 1011, "STORAGE_FAULT"
             with s.lock:
                 s.fail_closed("STORAGE_FAULT")
-            await socket.close(code=1011, reason="STORAGE_FAULT")
-        except WebSocketDisconnect:
-            pass
+            await socket.close(code=close_code, reason=close_reason)
+        except WebSocketDisconnect as exc:
+            close_code = exc.code
         finally:
             if acquired:
                 uplink_slot.release()
+                if close_code not in (1000, 1001):
+                    # Transport metadata only: never log peer input, session, token or JPEG.
+                    now = s.now()
+                    with s.lock:
+                        fps = s.video.metrics()["received_fps"]
+                        ai_p95 = s.analysis_metrics(now)["duration_p95_ms"]
+                        telemetry = dict(s.device_telemetry or {})
+                    logger.warning(
+                        "VIDEO_UPLINK_END reason=%s code=%s accepted_frames=%d "
+                        "duration_ms=%d idle_ms=%d received_fps=%s ai_p95_ms=%s "
+                        "control_rtt_ms=%s jpeg_bytes=%s free_heap_bytes=%s "
+                        "video_reconnects=%s",
+                        close_reason,
+                        close_code,
+                        accepted_frames,
+                        max(0, now - started),
+                        max(0, now - last_received),
+                        fps,
+                        ai_p95,
+                        telemetry.get("control_rtt_ms"),
+                        telemetry.get("last_jpeg_bytes"),
+                        telemetry.get("free_heap_bytes"),
+                        telemetry.get("video_reconnects"),
+                    )

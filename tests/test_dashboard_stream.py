@@ -36,7 +36,8 @@ def test_stream_script_is_loaded_and_cached_with_dashboard(cfg):
         assert client.get("/api/v2/live.mjpg").status_code == 401
 
 
-def test_mjpeg_metadata_freshness_and_viewer_slots(cfg):
+@pytest.mark.parametrize("accept", ["*/*", "application/octet-stream"])
+def test_mjpeg_metadata_freshness_and_viewer_slots(cfg, accept):
     from test_api import login
 
     with TestClient(main_module.create_app(cfg)) as client:
@@ -48,7 +49,9 @@ def test_mjpeg_metadata_freshness_and_viewer_slots(cfg):
         assert client.post("/api/v2/video/viewers", json={}, headers=headers).status_code == 429
         s = client.app.state.service
         endpoint = next(r.endpoint for r in client.app.routes if r.path == "/api/v2/live.mjpg")
-        request = SimpleNamespace(cookies=client.cookies, app=client.app)
+        request = SimpleNamespace(
+            cookies=client.cookies, app=client.app, headers={"accept": accept}
+        )
         with s.lock:
             s.video.publish("frame-1", b"fixture-jpeg", s.now() - 250, s.mode_revision)
 
@@ -57,6 +60,13 @@ def test_mjpeg_metadata_freshness_and_viewer_slots(cfg):
             try:
                 for lease in leases:
                     response = await endpoint(request, lease, s)
+                    assert response.media_type == (
+                        "application/octet-stream"
+                        if accept == "application/octet-stream"
+                        else "multipart/x-mixed-replace; boundary=frame"
+                    )
+                    assert response.headers["vary"] == "Accept"
+                    assert "no-store" in response.headers["cache-control"]
                     data = await anext(response.body_iterator)
                     assert b"Content-Length: 12\r\n" in data
                     assert b"X-Frame-Id: frame-1\r\n" in data

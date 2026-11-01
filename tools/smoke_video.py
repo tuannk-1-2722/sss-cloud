@@ -73,10 +73,18 @@ def run_video(client, address, runtime):
                     last_id = ack["frame_id"]
             latest = client.get("latest-frame")
             assert latest.headers["X-Frame-Id"] == last_id and latest.content == picture
-            with client.stream("GET", f"live.mjpg?lease_id={lease_id}") as response:
-                response.raise_for_status()
-                chunk = next(response.iter_raw())
-                assert b"X-Video-Revision:" in chunk and last_id.encode() in chunk
+            for accept, media in (
+                ("*/*", "multipart/x-mixed-replace; boundary=frame"),
+                ("application/octet-stream", "application/octet-stream"),
+            ):
+                with client.stream(
+                    "GET", f"live.mjpg?lease_id={lease_id}", headers={"Accept": accept}
+                ) as response:
+                    response.raise_for_status()
+                    assert response.headers["content-type"] == media
+                    assert response.headers["vary"] == "Accept"
+                    chunk = next(response.iter_raw())
+                    assert b"X-Video-Revision:" in chunk and last_id.encode() in chunk
 
         # Reject oversized data at the actual server protocol boundary.
         with connect(
@@ -100,6 +108,7 @@ def run_video(client, address, runtime):
             "fragmented_binary": "PASS",
             "two_transport_credits": "PASS",
             "mjpeg": "PASS",
+            "raw_fetch_mime": "PASS",
             "oversize_1009": "PASS",
             "anonymous_denied": "PASS",
             "physical_fps_measured": False,

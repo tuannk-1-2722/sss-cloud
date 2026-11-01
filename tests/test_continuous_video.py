@@ -212,14 +212,56 @@ def test_ws_auth_binary_sequence_and_no_admin_authority(cfg):
         )
 
 
-def test_mjpeg_event_wakeup_auth_revocation_and_mode_independence(cfg):
+def test_ws_stale_frame_reports_cause_without_private_input_and_releases_slot(cfg, caplog):
+    with TestClient(create_app(cfg)) as client:
+        headers = login(client)
+        client.post("/api/v2/video/viewers", json={}, headers=headers).raise_for_status()
+        s = client.app.state.service
+        from security_app.contracts import Hello
+
+        s.hello(
+            Hello(
+                protocol_version=2,
+                boot_id="private-boot-not-for-logs",
+                firmware_version="test",
+                source="simulator",
+                psram_bytes=0,
+            )
+        )
+        device = {"Authorization": "Bearer device-test-token-private"}
+        s.device_clock_offsets.append(s.now() - 3000)
+        with client.websocket_connect("/api/v2/devices/camera-1/video", headers=device) as socket:
+            socket.receive_json()
+            socket.send_bytes(pack_video(meta(s, 1), jpeg()))
+            with pytest.raises(WebSocketDisconnect) as caught:
+                socket.receive_json()
+            assert caught.value.code == 1008
+        records = [r.getMessage() for r in caplog.records if "VIDEO_UPLINK_END" in r.getMessage()]
+        assert len(records) == 1
+        assert "reason=CAPTURE_TOO_OLD code=1008 accepted_frames=0" in records[0]
+        assert "duration_ms=" in records[0] and "idle_ms=" in records[0]
+        for private in (s.session_id, s.boot_id, "device-test-token-private", "Authorization"):
+            assert private not in records[0]
+        # Diagnostics must neither keep the uplink slot nor admit the rejected JPEG.
+        assert s.video.latest is None
+        s.device_clock_offsets.clear()
+        with client.websocket_connect("/api/v2/devices/camera-1/video", headers=device) as socket:
+            socket.receive_json()
+            socket.send_bytes(pack_video(meta(s, 2), jpeg()))
+            assert socket.receive_json()["state"] == "video_received"
+
+
+@pytest.mark.parametrize("accept", ["*/*", "application/octet-stream"])
+def test_mjpeg_event_wakeup_auth_revocation_and_mode_independence(cfg, accept):
     with TestClient(create_app(cfg)) as client:
         headers = login(client)
         lease = client.post("/api/v2/video/viewers", json={}, headers=headers).json()["lease_id"]
         s, auth = client.app.state.service, client.app.state.auth
         owner = digest(client.cookies.get("sss_session"))
         route = next(r.endpoint for r in client.app.routes if r.path == "/api/v2/live.mjpg")
-        request = SimpleNamespace(cookies=client.cookies, app=client.app)
+        request = SimpleNamespace(
+            cookies=client.cookies, app=client.app, headers={"accept": accept}
+        )
 
         async def exercise():
             response = await route(request, lease, s)
