@@ -3,6 +3,8 @@
 Nâng cấp đang thực hiện: [`RECOGNITION_UPGRADE.md`](RECOGNITION_UPGRADE.md) —
 quyết định đã duyệt cho lượt đến cửa ngắn, trace/pilot và gate nhận diện che mặt.
 Chuẩn bị và thao tác tại trường: [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md).
+Thông báo điện thoại: [`NOTIFICATIONS.md`](NOTIFICATIONS.md) — Telegram, ảnh,
+sự kiện ngắn/người quen, retry, thiết lập bí mật và kiểm nhận trên điện thoại.
 
 **Đọc file này trước**, sau đó mở đúng tài liệu cần thiết theo task. Không cần nạp
 toàn bộ `docs/` mỗi lần; thứ tự ưu tiên dưới đây cho biết khi nào cần đọc gì.

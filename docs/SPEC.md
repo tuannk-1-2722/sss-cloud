@@ -149,7 +149,14 @@ Direction chưa rõ vẫn có thể có known info; warning geometry/direction n
 
 **FR-19 — Local alarm:** independent task kiểm deadline, không đợi upload/network. OFF khi boot/disarm/enrollment/mất control; test tối đa test cap khi DISARMED. GPIO owner duy nhất, active level theo module thực. Queue ACK bounded; overflow đưa OFF và phải có HIL report. Không cấp công suất buzzer từ GPIO.
 
-**EX-01 — Telegram:** text-only outbox unique event, disabled mặc định. HTTP timeout/retry/backoff có hạn; HTTP 429 theo retry_after có trần chờ. Alert quá expiry skipped/expired. Delivery timeout không bảo đảm exactly-once; state unknown sau hết retry. Không gửi ảnh face/token qua log; không điều khiển arm từ bot. Extension lỗi không làm core chờ.
+**EX-01 — Telegram:** outbox unique event, disabled mặc định. Text và ảnh opt-in
+qua consent riêng; warning/alarm luôn thuộc loại gửi, known và completion chưa
+xác định có cờ riêng, tránh lặp completion sau cảnh báo của cùng visit. Retry có
+lịch lưu bền, max attempts/expiry; HTTP429 theo retry_after cho cả chat. Timeout
+có thể gây trùng khi retry; crash/lỗi lưu trạng thái lúc gửi phải báo unknown.
+Provider sent không phải phone read. Không log token/ảnh/vector, không điều khiển
+ARM từ bot, không giữ coordinator lock trong HTTP. Migration003 và chi tiết
+photo/queue/test ở [NOTIFICATIONS](NOTIFICATIONS.md).
 
 ## 7. Dữ liệu và bảo vệ
 

@@ -69,10 +69,13 @@ def test_video_does_not_wait_for_ai_and_pending_is_newest(blocked):
     s, vision, _ = blocked
     s.set_mode("ARMED", s.mode_revision)
     assert s.video.demand()["interval_ms"] == 250
-    first = s.accept_video(meta(s, 1), jpeg())
+    # Distinct capture estimates: rapid synthetic calls can share a millisecond,
+    # which correctly triggers the worker's observation-clock regression guard.
+    received = s.now() - 2
+    first = s.accept_video(meta(s, 1), jpeg(), received_ms=received)
     assert vision.entered.wait(2)
-    second = s.accept_video(meta(s, 2), jpeg())
-    third = s.accept_video(meta(s, 3), jpeg())
+    second = s.accept_video(meta(s, 2), jpeg(), received_ms=received + 1)
+    third = s.accept_video(meta(s, 3), jpeg(), received_ms=received + 2)
     assert s.latest["frame_id"] == third["frame_id"]
     assert s.pending.frame_id == third["frame_id"]
     assert s.dropped == 1

@@ -113,7 +113,9 @@ class Store:
                 item = dict(r)
                 item["details"] = json.loads(item.pop("details_json"))
                 outbox = db.execute(
-                    "SELECT state,attempts,reason FROM outbox WHERE event_id=?", (r["id"],)
+                    "SELECT o.state,o.attempts,o.reason,d.next_attempt_at,d.delivered_at,d.media_kind,d.duplicate_possible "
+                    "FROM outbox o LEFT JOIN notification_delivery d ON d.outbox_id=o.id WHERE o.event_id=?",
+                    (r["id"],),
                 ).fetchone()
                 item["notification"] = dict(outbox) if outbox else None
                 command = db.execute(

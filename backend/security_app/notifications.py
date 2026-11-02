@@ -1,154 +1,260 @@
+"""Durable notification outbox. No provider I/O while holding the coordinator lock."""
+
 from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
-from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from datetime import datetime, timedelta, timezone
+from uuid import UUID, uuid4
 
-import httpx
+from .runtime import DomainError
+from .telegram import configuration, send
+from .telegram import dashboard_link as dashboard_link
+from .telegram import telegram_message as telegram_message
 
 logger = logging.getLogger(__name__)
 
 
-def dashboard_link() -> str | None:
-    """Only allow operator-configured HTTPS private dashboard URLs for Telegram."""
-    url = os.environ.get("SSS_DASHBOARD_URL", "").strip()
-    if not url or len(url) > 512:
-        return None
-    parsed = urlsplit(url)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-        return None
-    if parsed.fragment or parsed.query or any(c.isspace() for c in url):
-        return None
-    return url.rstrip("/") + "/"
+def should_notify(decision, cfg, prior_notification=False):
+    if decision["severity"] in {"warning", "alarm"}:
+        return True
+    if decision["reason"] == "known_visit":
+        return cfg["notify_known_visits"]
+    return (
+        cfg["notify_unresolved_visits"]
+        and not prior_notification
+        and decision["reason"] == "visit_completed"
+        and decision.get("identity") in {"UNCERTAIN", "UNKNOWN"}
+    )
 
 
-def telegram_message(row) -> tuple[str, dict | None]:
-    reason = {
-        "unknown_approach": "CẢNH BÁO: khách chưa đăng ký tiếp cận cửa",
-        "unresolved_presence": "CẦN KIỂM TRA: chưa đủ căn cứ nhận diện",
-        "known_visit": "Người đã đăng ký ghé cửa",
-    }.get(row["event_reason"], "Sự kiện camera vùng cửa")
-    text = (
-        f"Smart Security | {reason}\n"
-        f"Camera: cửa chính\n"
-        f"Thời điểm (UTC): {row['created_at']}\n"
-        f"Sự kiện: {row['event_id']}"
-    )
-    link = dashboard_link()
-    keyboard = (
-        {"inline_keyboard": [[{"text": "Xem camera trực tiếp / lịch sử", "url": link + "?live=1"}]]}
-        if link
-        else None
-    )
-    return text, keyboard
+def status(service):
+    result = configuration(service.cfg["notifications"])
+    with service.store.connection() as db:
+        result["counts"] = dict(db.execute("SELECT state,COUNT(*) FROM outbox GROUP BY state"))
+        row = db.execute(
+            "SELECT o.state,o.reason,d.delivered_at,d.media_kind,d.duplicate_possible "
+            "FROM outbox o LEFT JOIN notification_delivery d ON d.outbox_id=o.id "
+            "ORDER BY o.created_at DESC,o.rowid DESC LIMIT 1"
+        ).fetchone()
+        result["latest"] = dict(row) if row else None
+    return result
+
+
+def enqueue_test(service, key, include_photo=False):
+    """Explicit operator test, marked system_test. Caller holds coordinator lock."""
+    ready = configuration(service.cfg["notifications"])
+    if not ready["ready"]:
+        raise DomainError(ready["reason"] or "PROVIDER_NOT_CONFIGURED")
+    if include_photo and not ready["photos_enabled"]:
+        raise DomainError("PHOTO_CONSENT_REQUIRED")
+    fingerprint = json.dumps(["notification-test", include_photo])
+    with service.store.connection() as db:
+        old = db.execute(
+            "SELECT fingerprint,response_json FROM action_keys WHERE key=?", (key,)
+        ).fetchone()
+        if old:
+            if old["fingerprint"] != fingerprint:
+                raise DomainError("IDEMPOTENCY_KEY_REUSED")
+            return json.loads(old["response_json"])
+        now = datetime.now(timezone.utc)
+        recent = db.execute(
+            "SELECT 1 FROM events WHERE reason='notification_test' AND created_at>?",
+            ((now - timedelta(seconds=30)).isoformat(),),
+        ).fetchone()
+        if recent:
+            raise DomainError("NOTIFICATION_TEST_RATE_LIMIT", 429)
+        jpeg = None
+        if include_photo:
+            latest = service.latest
+            if (
+                not latest
+                or service.now() - latest["received_ms"] + latest.get("capture_age_ms", 0)
+                > service.cfg["video"]["stale_ms"]
+            ):
+                raise DomainError("FRAME_NOT_AVAILABLE", 409)
+            jpeg = latest["jpeg"]
+        event_id, media_id = str(uuid4()), str(uuid4()) if jpeg else None
+        response = {"event_id": event_id, "state": "pending"}
+        details = {"test": True, "audible": False, "mode_revision": service.mode_revision}
+        try:
+            if jpeg:
+                temp = service.runtime / "media" / f"{media_id}.tmp"
+                temp.write_bytes(jpeg)
+                temp.replace(temp.with_suffix(".jpg"))
+            db.execute(
+                "INSERT INTO events VALUES(?,?,?,?,?,?,?,?,NULL)",
+                (
+                    event_id,
+                    f"notification-test-{event_id}",
+                    "notification_test",
+                    "info",
+                    now.isoformat(),
+                    "system_test",
+                    json.dumps(details),
+                    media_id,
+                ),
+            )
+            db.execute(
+                "INSERT INTO outbox(id,event_id,state,attempts,created_at) VALUES(?,?,'pending',0,?)",
+                (str(uuid4()), event_id, now.isoformat()),
+            )
+            db.execute(
+                "INSERT INTO action_keys VALUES(?,?,?,?)",
+                (key, fingerprint, json.dumps(response), now.isoformat()),
+            )
+        except Exception:
+            if media_id:
+                for suffix in (".jpg", ".tmp"):
+                    (service.runtime / "media" / f"{media_id}{suffix}").unlink(missing_ok=True)
+            raise
+    return response
 
 
 class Notifier:
-    """Optional event + photo outbox; provider I/O is outside inference worker."""
-
     def __init__(self, service):
         self.service = service
         self.stop_event = threading.Event()
+        # A process died during provider I/O: delivery is uncertain, never silently call it sent.
+        with service.store.connection() as db:
+            db.execute(
+                "UPDATE outbox SET state='unknown',reason='PROCESS_INTERRUPTED' WHERE state='sending'"
+            )
         self.thread = threading.Thread(target=self.run, name="notification-worker", daemon=True)
         self.thread.start()
 
     def close(self):
         self.stop_event.set()
-        self.thread.join(timeout=4)
+        self.thread.join(timeout=14)
+        if self.thread.is_alive():
+            # Retain the service/runtime lock until process exit rather than overlap senders.
+            raise RuntimeError("NOTIFICATION_WORKER_DID_NOT_STOP")
 
     def run(self):
         while not self.stop_event.wait(1):
             try:
-                self.step()
                 self.service.notification_error = None
+                self.step()
             except Exception:
-                # Do not log provider exception text: URLs can contain bot tokens.
                 self.service.notification_error = "NOTIFICATION_WORKER_FAULT"
                 logger.error("Notification iteration failed; retrying without blocking core")
                 self.stop_event.wait(2)
 
     def step(self):
-        cfg = self.service.cfg["notifications"]
-        with self.service.store.connection() as db:
-            row = db.execute(
-                "SELECT o.*,e.reason AS event_reason, e.media_id, e.id AS event_id "
-                "FROM outbox o JOIN events e "
-                "ON o.event_id=e.id WHERE o.state='pending' ORDER BY o.created_at LIMIT 1"
-            ).fetchone()
-        if not row:
-            return
-        age = (
-            datetime.now(timezone.utc) - datetime.fromisoformat(row["created_at"])
-        ).total_seconds() * 1000
-        if not cfg["telegram_enabled"]:
-            state, reason = "disabled", None
-        elif age > cfg["expiry_ms"]:
-            state, reason = "expired", "ALERT_TOO_OLD"
-        elif not os.environ.get("SSS_TELEGRAM_TOKEN") or not os.environ.get("SSS_TELEGRAM_CHAT"):
-            state, reason = "failed", "PROVIDER_NOT_CONFIGURED"
-        else:
-            # Telegram can accept a request whose response times out: bounded retry may duplicate.
-            token, chat = os.environ["SSS_TELEGRAM_TOKEN"], os.environ["SSS_TELEGRAM_CHAT"]
-            try:
-                media_path = None
-                if row["media_id"]:
-                    candidate = self.service.store.runtime / "media" / f"{row['media_id']}.jpg"
-                    if candidate.exists():
-                        media_path = candidate
-
-                text, keyboard = telegram_message(row)
-                if media_path:
-                    with open(media_path, "rb") as f:
-                        response = httpx.post(
-                            f"https://api.telegram.org/bot{token}/sendPhoto",
-                            timeout=10.0,
-                            trust_env=False,
-                            data={
-                                **{"chat_id": chat, "caption": text},
-                                **({"reply_markup": json.dumps(keyboard)} if keyboard else {}),
-                            },
-                            files={"photo": ("image.jpg", f, "image/jpeg")},
-                        )
-                else:
-                    response = httpx.post(
-                        f"https://api.telegram.org/bot{token}/sendMessage",
-                        timeout=3.0,
-                        trust_env=False,
-                        json={
-                            "chat_id": chat,
-                            "text": text,
-                            **({"reply_markup": keyboard} if keyboard else {}),
-                        },
-                    )
-                payload = response.json()
-                if not isinstance(payload, dict):
-                    raise ValueError("Invalid provider response")
-                if response.is_success and payload.get("ok"):
-                    state, reason = "sent", None
-                elif response.status_code == 429:
-                    parameters = payload.get("parameters", {})
-                    raw_delay = (
-                        parameters.get("retry_after", 2) if isinstance(parameters, dict) else 2
-                    )
-                    delay = min(60, max(1, raw_delay if type(raw_delay) is int else 2))
-                    self.stop_event.wait(delay)
-                    state, reason = "pending", "RATE_LIMIT"
-                elif response.status_code >= 500:
-                    state, reason = "pending", "PROVIDER_ERROR"
-                else:
-                    state, reason = "failed", "PROVIDER_REJECTED"
-            except (httpx.HTTPError, ValueError, TypeError):
-                state, reason = "pending", "DELIVERY_UNCONFIRMED"
-            if state == "pending":
-                if row["attempts"] + 1 >= cfg["max_attempts"]:
-                    state = "unknown" if reason == "DELIVERY_UNCONFIRMED" else "failed"
-                else:
-                    self.stop_event.wait(min(30, 2 ** (row["attempts"] + 1)))
-        with self.service.store.connection() as db:
+        s, now = self.service, datetime.now(timezone.utc)
+        cfg = s.cfg["notifications"]
+        with s.lock, s.store.connection() as db:
+            # Only one sender exists. A leftover claim from a failed previous iteration is uncertain.
             db.execute(
-                "UPDATE outbox SET state=?,reason=?,attempts=attempts+1 WHERE id=?",
-                (state, reason, row["id"]),
+                "UPDATE outbox SET state='unknown',reason='DELIVERY_STATE_LOST' WHERE state='sending'"
             )
+            db.execute(
+                "UPDATE outbox SET state='expired',reason='ALERT_TOO_OLD' WHERE state='pending' AND created_at<?",
+                ((now - timedelta(milliseconds=cfg["expiry_ms"])).isoformat(),),
+            )
+            if not cfg["telegram_enabled"]:
+                db.execute("UPDATE outbox SET state='disabled' WHERE state='pending'")
+                return
+            ready = configuration(cfg)
+            if not ready["ready"]:
+                s.notification_error = ready["reason"]
+                return
+            cooldown = db.execute(
+                "SELECT not_before FROM notification_runtime WHERE singleton=1"
+            ).fetchone()[0]
+            if cooldown and cooldown > now.isoformat():
+                return
+            row = db.execute(
+                "SELECT o.*,e.reason AS event_reason,e.media_id,e.id AS event_id,d.duplicate_possible "
+                "FROM outbox o JOIN events e ON o.event_id=e.id "
+                "LEFT JOIN notification_delivery d ON d.outbox_id=o.id "
+                "WHERE o.state='pending' AND (d.next_attempt_at IS NULL OR d.next_attempt_at<=?) "
+                "ORDER BY CASE e.severity WHEN 'alarm' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,o.created_at,o.rowid LIMIT 1",
+                (now.isoformat(),),
+            ).fetchone()
+            if not row:
+                return
+            row = dict(row)
+            if row["attempts"] >= cfg["max_attempts"]:
+                db.execute(
+                    "UPDATE outbox SET state='unknown',reason='ATTEMPT_LIMIT' WHERE id=?",
+                    (row["id"],),
+                )
+                return
+            photo = None
+            if ready["photos_enabled"] and row["media_id"]:
+                try:
+                    UUID(row["media_id"])
+                    media = s.runtime / "media"
+                    path = media / f"{row['media_id']}.jpg"
+                    if path.resolve().is_relative_to(media.resolve()):
+                        with path.open("rb") as f:
+                            data = f.read(s.cfg["limits"]["max_frame_bytes"] + 1)
+                        if 0 < len(data) <= s.cfg["limits"]["max_frame_bytes"]:
+                            photo = data
+                except (OSError, ValueError):
+                    pass  # Deleted/expired media falls back to the event text.
+            db.execute(
+                "UPDATE outbox SET state='sending',attempts=attempts+1 WHERE id=?", (row["id"],)
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO notification_delivery(outbox_id) VALUES(?)", (row["id"],)
+            )
+            db.execute(
+                "UPDATE notification_delivery SET last_attempt_at=? WHERE outbox_id=?",
+                (now.isoformat(), row["id"]),
+            )
+        if self.stop_event.is_set():
+            result_state, reason, result = "unknown", "PROCESS_INTERRUPTED", None
+        else:
+            result = send(row, photo)  # NO coordinator lock during HTTP or provider backoff.
+            result_state, reason = result.state, result.reason
+        finished = datetime.now(timezone.utc)
+        next_at = None
+        if result_state == "retry":
+            if row["attempts"] + 1 >= cfg["max_attempts"]:
+                result_state = "unknown" if reason == "DELIVERY_UNCONFIRMED" else "failed"
+            else:
+                result_state = "pending"
+                delay = (
+                    result.retry_after
+                    if result.retry_after is not None
+                    else min(30, 2 ** (row["attempts"] + 1))
+                )
+                # Saturate to representable time; never retry early because of an overflow.
+                delay = min(
+                    delay,
+                    int((datetime.max.replace(tzinfo=timezone.utc) - finished).total_seconds()) - 1,
+                )
+                next_at = (finished + timedelta(seconds=delay)).isoformat()
+        with s.store.connection() as db:
+            # Deletion/cancellation during I/O must not be resurrected by a late result.
+            changed = db.execute(
+                "UPDATE outbox SET state=?,reason=? WHERE id=? AND state='sending'",
+                (result_state, reason, row["id"]),
+            ).rowcount
+            if changed:
+                db.execute(
+                    "UPDATE notification_delivery SET next_attempt_at=?,delivered_at=?,provider_message_id=?,media_kind=?,"
+                    "duplicate_possible=MAX(duplicate_possible,?) WHERE outbox_id=?",
+                    (
+                        next_at,
+                        finished.isoformat() if result_state == "sent" else None,
+                        result.message_id if result else None,
+                        result.media_kind if result else None,
+                        int(reason == "DELIVERY_UNCONFIRMED"),
+                        row["id"],
+                    ),
+                )
+            if reason == "RATE_LIMIT" and result and result.retry_after:
+                delay = min(
+                    result.retry_after,
+                    int((datetime.max.replace(tzinfo=timezone.utc) - finished).total_seconds()) - 1,
+                )
+                db.execute(
+                    "UPDATE notification_runtime SET not_before=? WHERE singleton=1",
+                    ((finished + timedelta(seconds=delay)).isoformat(),),
+                )
+        if result_state not in {"sent", "pending"}:
+            s.notification_error = reason

@@ -35,6 +35,15 @@ của nhánh dev. Video và đăng ký không tự bật giám sát hoặc còi.
 
 ## Kịch bản trình diễn
 
+Nếu trình diễn thông báo điện thoại, mở mục **Telegram** trên dashboard, kiểm tra
+sẵn sàng và chế độ ảnh. Bấm **Gửi thử Telegram**, chọn kèm ảnh mới nhất khi có
+video; xác nhận tin, ảnh và nút mở web trên điện thoại. Thử khi web đóng và điện
+thoại dùng mạng di động. Bật thông báo Telegram, bỏ mute bot nếu cần. Test gửi
+không tự bật giám sát hoặc còi. `Telegram đã nhận` trên web là provider chấp nhận,
+không thay cho việc nhìn thấy tin trên điện thoại. Các lượt known và chưa xác
+định ngắn có thể báo riêng theo [NOTIFICATIONS](NOTIFICATIONS.md); completion
+không gửi lặp nếu lượt đó đã có thông báo.
+
 | Lượt | Hành động | Kết quả cần đối chiếu |
 |---|---|---|
 | Người quen | Tiếp cận 4–5 giây, dừng vặn khóa 1–2 giây rồi đi | Đúng hồ sơ, lịch sử có lượt; không còi |

@@ -21,6 +21,7 @@ from .contracts import (
     IdempotentAction,
     Login,
     ModeChange,
+    NotificationTest,
     PersonCreate,
     Silence,
     Sync,
@@ -226,6 +227,13 @@ def create_app(config: dict | None = None) -> FastAPI:
     def recognition_diagnostics(after: int = 0, s: SecurityService = Depends(service)):
         with s.lock:
             return s.diagnostics.snapshot(s.now(), after=max(0, after))
+
+    @app.post("/api/v2/notifications/test", status_code=202, dependencies=[Depends(admin)])
+    def notification_test(body: NotificationTest, s: SecurityService = Depends(service)):
+        from .notifications import enqueue_test
+
+        with s.lock:
+            return enqueue_test(s, body.idempotency_key, body.include_photo)
 
     @app.post("/api/v2/diagnostics/recognition/start", dependencies=[Depends(admin)])
     def start_recognition_diagnostics(s: SecurityService = Depends(service)):

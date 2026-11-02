@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="/static/icon-192.png">
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/camera-stream.js" defer></script>
-  <script src="/static/app.js?v=doorstep-demo-1" defer></script>
+  <script src="/static/app.js?v=telegram-demo-1" defer></script>
 </head>
 <body>
   <header><div><span class="eyebrow">IOT · CAMERA DASHBOARD</span><h1>Smart Security</h1></div>
@@ -31,6 +31,13 @@
         <div class="monitor-grid"><article class="card"><div class="image-wrap"><img id="camera-image" alt="Ảnh camera mới nhất" hidden><canvas id="overlay"></canvas><p id="image-empty">Chưa có ảnh camera</p></div><div class="metrics-bar"><span id="image-age" class="metric-pill">Tuổi ảnh: chưa có</span><span id="metric-fps" class="metric-pill">FPS: --</span><span id="metric-latency" class="metric-pill">Độ trễ API: --</span></div></article>
           <article class="card"><h3>Trạng thái hệ thống</h3><dl id="health"></dl><h3>Đối tượng hiện tại</h3><div id="tracks"></div></article></div>
         <p class="muted">Cảnh báo danh tính và xác nhận còi là hai trạng thái riêng. Người ngoài vùng cửa không tự làm còi kêu.</p>
+        <article class="card"><h3>Thông báo điện thoại · Telegram</h3>
+          <p id="telegram-state" role="status">Đang kiểm tra cấu hình…</p>
+          <p id="telegram-delivery" class="muted"></p>
+          <div class="actions"><label class="checkbox"><input id="telegram-test-photo" type="checkbox"> Kèm ảnh camera mới nhất</label>
+          <button id="telegram-test" disabled>Gửi thử Telegram</button></div>
+          <p class="muted">Gửi thử chỉ kiểm tra thông báo, không chạy AI hoặc còi. “Telegram đã nhận” cần đối chiếu với điện thoại nhận thực tế.</p>
+        </article>
       </section>
       <section id="people" class="tab" hidden>
         <div class="toolbar"><div><h2>Người quen</h2><p>Đăng ký tạo mẫu so khớp, không huấn luyện lại mạng AI.</p></div><span id="people-count"></span></div>

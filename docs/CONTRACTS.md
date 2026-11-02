@@ -1,5 +1,15 @@
 # Contracts v2 — firmware, backend, AI và dashboard
 
+Notification extension 02/11: authenticated status thêm `notifications` gồm
+enabled/ready/reason, quyền ảnh, loại sự kiện, counts/latest; không lộ token/chat.
+POST `/api/v2/notifications/test` admin+CSRF, body `{idempotency_key, include_photo:false}`,
+202 trả `{event_id,state:"pending"}`. Cùng key/cùng body idempotent; đổi body409,
+key mới trong30giây429. Ảnh thử cần consent và frame mới; không tạo command hoặc
+AI observation, event mang `source=system_test`, reason `notification_test`.
+History `notification` thêm next_attempt_at/delivered_at/media_kind/duplicate_possible.
+`sent` là provider accepted, không là điện thoại đã đọc. Device contract không đổi.
+Xem [NOTIFICATIONS](NOTIFICATIONS.md).
+
 Base `/api/v2`. Wire identifiers tiếng Anh; JSON UTF-8, extra fields bị từ chối ở request Pydantic. UUID/session là opaque. Một board `device_id` slug theo config. Thời gian server UTC cho history; timeout dùng monotonic/uptime, không trừ UTC cho millis.
 
 **Cập nhật 31/10/2026:** video liên tục dùng giao thức ở mục 7 bên dưới. Hello/

@@ -1,5 +1,5 @@
 /* Static shell only. Never cache login, camera frames, events or biometric evidence. */
-const SHELL = "sss-static-v9";
+const SHELL = "sss-static-v10";
 const ASSETS = ["/static/app.css", "/static/camera-stream.js", "/static/app.js", "/static/icon-192.png", "/static/icon-512.png", "/manifest.webmanifest"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(ASSETS)));

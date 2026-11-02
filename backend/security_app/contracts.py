@@ -175,5 +175,9 @@ class IdempotentAction(StrictModel):
     idempotency_key: str = Field(min_length=8, max_length=64)
 
 
+class NotificationTest(IdempotentAction):
+    include_photo: StrictBool = False
+
+
 class Silence(IdempotentAction):
     visit_id: str

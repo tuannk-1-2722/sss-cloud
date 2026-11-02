@@ -101,6 +101,11 @@ def validate_config(c: dict) -> None:
     shape(c, defaults)
     if c["diagnostics"]["history_limit"] > 1024 or c["diagnostics"]["trace_duration_ms"] > 300000:
         raise ValueError("Diagnostics history or trace duration exceeds bounds")
+    if (
+        not 1000 <= c["notifications"]["expiry_ms"] <= 3600000
+        or c["notifications"]["max_attempts"] > 10
+    ):
+        raise ValueError("Notification expiry or retry bound is invalid")
     if c["cloud"]["inference"] not in {"local", "cloud"}:
         raise ValueError("cloud.inference must be local or cloud")
     if not 300 <= c["cloud"]["inference_timeout_ms"] <= 10000:
