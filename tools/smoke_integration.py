@@ -90,7 +90,8 @@ def run(root: Path) -> dict:
                 report["video"] = run_video(client, address, runtime)
                 for scenario, reason in [
                     ("unknown", "unknown_approach"),
-                    ("direct-b", "unresolved_presence"),
+                    ("direct-b", "unknown_approach"),
+                    ("unidentified", "unresolved_presence"),
                     ("known", "known_visit"),
                 ]:
                     baseline = {event["id"] for event in client.get("events").json()}
@@ -140,7 +141,7 @@ def run(root: Path) -> dict:
                                 None,
                             )
                         )
-                        if scenario == "unknown":
+                        if scenario in {"unknown", "direct-b"}:
                             assert event["details"]["audible"]
                             event_id = event["id"]
                             event = wait_for(

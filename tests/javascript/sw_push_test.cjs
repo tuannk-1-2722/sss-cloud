@@ -55,7 +55,9 @@ test('push drops foreign, non-evidence or malformed image URLs and survives bad 
     await w.push({title: 't', image});
   }
   await w.push(null, true);
-  assert.equal(w.shown.length, 5);
+  await w.push(null);
+  await w.push([]);
+  assert.equal(w.shown.length, 7);
   assert.ok(w.shown.every(item => item.options.image === undefined));
   assert.equal(w.shown[4].title, 'Smart Security');
 });

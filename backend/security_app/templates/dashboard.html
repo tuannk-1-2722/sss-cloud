@@ -13,7 +13,7 @@
 </head>
 <body>
   <header><div><span class="eyebrow">IOT · CAMERA DASHBOARD</span><h1>Smart Security</h1></div>
-    <span id="connection" class="badge">Chưa đăng nhập</span><button id="push-toggle" hidden>Bật thông báo</button><button id="logout" hidden>Đăng xuất</button></header>
+    <span id="connection" class="badge">Chưa đăng nhập</span><button id="push-toggle" hidden>Bật thông báo</button><button id="push-test" hidden>Thử thông báo PWA</button><button id="logout" hidden>Đăng xuất</button></header>
   <main>
     <section id="login-panel" class="card compact"><h2>Đăng nhập quản trị</h2>
       <p>Dùng tài khoản nhóm đã tạo khi thiết lập hệ thống.</p>
@@ -22,6 +22,7 @@
         <button class="primary" type="submit">Đăng nhập</button></form>
     </section>
     <div id="app" hidden>
+      <p id="push-help" class="hint" hidden></p>
       <div id="profile-banner" class="notice"></div>
       <nav><button data-tab="monitor" class="selected">Giám sát</button><button data-tab="people">Người quen</button><button data-tab="history">Lịch sử</button></nav>
       <section id="monitor" class="tab">

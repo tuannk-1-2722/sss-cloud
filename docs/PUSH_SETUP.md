@@ -1,88 +1,67 @@
-# Hướng dẫn bật Web Push trên PWA (Oracle `btliot05.duckdns.org` hoặc Tailscale)
+# PWA cho demo 03/11 — Android và iPhone
 
-**Mục đích:** Điện thoại nhận thông báo đẩy (kèm ảnh bằng chứng trên Android) ngay cả khi khoá màn hình, hoàn toàn trên PWA của nhóm — không cần Telegram.
+Bản PWA/Web Push từ `main` được ghép với AI đã được operator test ổn. Cùng một
+sự kiện có thể gửi tới cả hai điện thoại; mỗi thiết bị phải đăng ký riêng.
+Không cần đăng ký lại khuôn mặt. Telegram tiếp tục hoạt động độc lập.
 
-Vì hệ thống chính của nhóm (backend, AI, DB và ảnh từ ESP32-CAM) đã chạy trực tiếp trên máy chủ Oracle tại **`https://btliot05.duckdns.org`**, việc bật Web Push chỉ cần thực hiện trên máy chủ Oracle đó, sau đó mở web trên điện thoại bấm **Bật thông báo**.
+## 1. Cài và cấp quyền trên từng điện thoại
 
-> Đây là hướng dẫn cấu hình và kiểm tra, chưa phải báo cáo nghiệm thu HIL. Không đưa khoá `vapid_private.pem`, `push_media.key` hay file `service.env` vào Git hoặc ảnh chụp màn hình.
+**Android (Chrome)**
 
----
+1. Mở `https://btliot05.duckdns.org`, chọn menu Chrome → Cài đặt ứng dụng /
+   Thêm vào Màn hình chính nếu trình duyệt cung cấp.
+2. Mở app, đăng nhập. Bấm **Bật thông báo** → **Cho phép**.
+3. Khi nút đổi thành **Tắt thông báo**, bấm **Thử thông báo PWA**.
+4. Kiểm có thông báo Smart Security. Khóa màn hình và thực hiện một lượt camera
+   thật để kiểm nhận tự động. Android có thể hiển thị ảnh bằng chứng.
 
-## 1. Cập nhật trên máy chủ Oracle (`btliot05.duckdns.org`)
+**iPhone (Safari)**
 
-SSH vào máy chủ Oracle (user `ubuntu`, thư mục project như trong `docs/LEVEL3_SETUP_GUIDE.md` mục 6–7):
+1. Dùng Safari mở cùng URL → Chia sẻ → **Thêm vào Màn hình chính**.
+2. Đóng tab Safari và **mở bằng biểu tượng vừa tạo**, rồi đăng nhập.
+3. Bấm **Bật thông báo** trong app → **Cho phép**, sau đó **Thử thông báo PWA**.
+4. Kiểm Cài đặt iPhone → Thông báo → Smart Security: cho phép trên màn hình khóa;
+   tắt Focus/Không làm phiền trong buổi demo nếu cần.
+5. Thông báo trên iPhone có thể chỉ hiện chữ; mở app → Lịch sử để xem ảnh.
 
-### Bước 1.1: Pull code mới và cài thư viện `pywebpush`
-```bash
-cd ~/smart-security
-git fetch origin
-git checkout feat/doorstep-visit-recognition
-git pull --ff-only origin feat/doorstep-visit-recognition
-./.venv/bin/python -m pip install -r requirements.txt
-```
+Web Push trên iPhone cần Home Screen web app và quyền được xin từ thao tác của
+người dùng, theo [WebKit](https://webkit.org/blog/13878/). Không có cách cấu hình
+server thay cho thao tác Cho phép trên từng điện thoại. Khi quyền đã bị từ chối,
+cần đổi trong cài đặt thiết bị/trình duyệt rồi mở lại app.
 
-### Bước 1.2: Sinh khoá VAPID (chỉ chạy 1 lần)
-```bash
-SSS_CONFIG=~/sss-private/local.yaml ./.venv/bin/python -m tools.manage push-keys
-```
-Lệnh này tự tạo `vapid_private.pem` trong thư mục `runtime_dir` của server và in ra `vapid_public_key`.
+## 2. Kiểm server và thông báo
 
-### Bước 1.3: Thêm biến môi trường vào `~/sss-private/service.env`
-Mở `nano ~/sss-private/service.env` và đảm bảo có 3 dòng sau:
-```ini
-SSS_HTTPS=1
-SSS_DASHBOARD_URL=https://btliot05.duckdns.org
-SSS_VAPID_SUBJECT=mailto:huyquang2k5@gmail.com
-```
+- `GET /api/v2/push/config` sau đăng nhập cho biết enabled/configured, số thiết
+  bị và số outbox theo trạng thái; không trả khóa riêng hoặc endpoint thuê bao.
+- Nút **Thử thông báo PWA** gọi admin+CSRF API, idempotent và giới hạn một lần/30s.
+  Đây là thông báo chữ được đánh dấu `system_test`, không gọi còi hoặc Telegram.
+- Các sự kiện camera thật giữ ảnh opt-in và URL ảnh được ký, TTL mặc định10phút.
+  Sai/hết hạn chữ ký, ảnh đã xóa hoặc tắt ảnh/Push trả404; không cache ảnh/API.
+- Ledger migration005 theo dõi từng thiết bị: máy đã nhận không bị gửi lại khi
+  máy kia cần retry. `partial` nghĩa là chưa xác nhận đủ các máy. `sent` là push
+  service chấp nhận, không chứng minh người đã đọc hoặc OS đã hiển thị.
+- Crash giữa lúc gửi được đánh dấu `unknown`, không âm thầm gửi lại. VAPID key
+  giữ ổn định qua restart; không tự xoay khóa trước demo.
 
-### Bước 1.4: Bật `push_enabled` trong `~/sss-private/local.yaml`
-Mở `nano ~/sss-private/local.yaml`, trong mục `notifications:` thêm `push_enabled: true`:
-```yaml
-notifications:
-  push_enabled: true
-  push_include_image: true
-  push_image_ttl_s: 600
-```
-*(Nếu muốn nhận luôn thông báo kèm ảnh cho cả người quen ghé cửa và lượt chưa xác định khi kết thúc lượt, giữ `notify_known_visits: true` và `notify_unresolved_visits: true` như hiện tại).*
+## 3. Cấu hình vận hành đã chuẩn bị cho Oracle
 
-### Bước 1.5: Khởi động lại service
-```bash
-sudo systemctl restart smart-security
-sudo systemctl status smart-security --no-pager
-```
-*(Lưu ý: Caddy trên Oracle đang `reverse_proxy 127.0.0.1:8000` cho toàn bộ domain nên tự động chuyển tiếp cả `/api/v2/push/*` và `/push-media/*`, không cần sửa Caddyfile).*
+Server dùng Python venv và source release đồng nhất; dependencies từ lockfile,
+migrations004/005, VAPID private key và HMAC key chỉ nằm trong runtime/private.
+Private hardware config bật push và ảnh; `SSS_VAPID_SUBJECT` là HTTPS URL của hệ
+thống. Auth/CSRF của dashboard vẫn bắt buộc, ảnh thông báo chỉ có capability
+link ngắn hạn. Không đưa key, DB, subscription endpoint hoặc ảnh thật vào Git.
 
----
+Không `git pull` đè một runtime đang có source sửa riêng. Việc nâng cấp dùng
+staging/backup/source hashes, kiểm software + native rồi mới rollout. Nếu cần
+rollback binary sau migration005, giữ file migrations004/005 để runner nhận
+ledger hiện có; không restore DB cũ đè gallery hoặc các sự kiện mới.
 
-## 2. Bật thông báo trên điện thoại
+## 4. Khi chưa nhận được thông báo
 
-1. Mở **`https://btliot05.duckdns.org`** bằng **Chrome** (Android) hoặc **Safari** (iPhone).
-   - **Nếu dùng iPhone (iOS ≥ 16.4):** bấm nút **Chia sẻ** → **Thêm vào Màn hình chính** (Add to Home Screen), sau đó mở ứng dụng từ icon ngoài màn hình chính.
-   - **Nếu dùng Android Chrome:** có thể bấm menu `⋮` → **Cài đặt ứng dụng** (Install app) để cài như app thật, hoặc dùng trực tiếp trên Chrome.
-2. Đăng nhập tài khoản quản trị (`admin`).
-3. Ở góc trên cùng bên phải (cạnh nút **Đăng xuất**), bấm nút **`Bật thông báo`** → chọn **Cho phép** (Allow) khi trình duyệt hỏi quyền.
-4. Khi thành công, nút sẽ đổi thành **`Tắt thông báo`**.
-
----
-
-## 3. Kiểm tra nghiệm thu
-
-1. **Tạo sự kiện:** Bật giám sát (`ARMED`) và đi vào vùng cửa trước camera (hoặc chờ hết lượt để tạo sự kiện `Ket qua luot vua ket thuc`).
-2. **Trên điện thoại (đang khoá màn hình):**
-   - Nhận được thông báo đẩy của **Smart Security**.
-   - **Android:** hiện luôn ảnh chụp từ camera ngay trong thông báo.
-   - **iPhone:** hiện tiêu đề và thời gian (iOS Web Push chưa hỗ trợ trường `image`), bấm vào thông báo sẽ mở thẳng ứng dụng để xem ảnh trong mục **Lịch sử**.
-3. **Kiểm tra an toàn link ảnh (`/push-media/{media_id}?exp=...&sig=...`):**
-   - Link ảnh không cần cookie để hệ điều hành tải được ảnh thông báo, nhưng được ký HMAC-SHA256 và tự hết hạn sau `push_image_ttl_s` (mặc định 10 phút).
-   - Sau khi hết hạn hoặc nếu sửa 1 ký tự trong `sig`/`exp`, server trả về `404 MEDIA_NOT_FOUND`.
-   - Khi đặt `push_enabled: false`, toàn bộ route `/push-media/*` và `/api/v2/push/subscribe` tự động đóng (fail-closed).
-
----
-
-## 4. Xử lý lỗi thường gặp
-
-| Hiện tượng | Cách kiểm tra & khắc phục |
-|---|---|
-| Không thấy nút **Bật thông báo** sau khi đăng nhập | 1) Bấm `Ctrl+F5` hoặc xoá cache trình duyệt để tải `app.js` mới.<br>2) Kiểm tra `GET /api/v2/push/config`: nếu `enabled: false` là chưa sửa `local.yaml`; nếu `configured: false` là thiếu `SSS_DASHBOARD_URL`, `SSS_VAPID_SUBJECT` hoặc chưa chạy `push-keys`.<br>3) Trên iPhone bắt buộc phải mở từ icon ngoài Màn hình chính. |
-| Có thông báo chữ nhưng không hiện ảnh | Trên iPhone là giới hạn của iOS. Trên Android: kiểm tra `push_include_image: true` và sự kiện trong tab **Lịch sử** có ảnh bằng chứng hay không. |
-| Đổi tên miền hoặc tạo lại khoá VAPID | Trên điện thoại bấm `Tắt thông báo` rồi bấm lại `Bật thông báo` để đăng ký lại với khoá mới. |
+1. Mở app đúng biểu tượng, đăng nhập lại nếu server vừa restart, tải lại app để
+   nhận script/SW mới. Kiểm có nút **Tắt thông báo** trên chính máy đó.
+2. Kiểm quyền thông báo, Focus/tiết kiệm pin, Internet điện thoại và số thiết bị
+   đã đăng ký. Không dùng số đếm subscriber để kết luận điện thoại đã nhận.
+3. Bấm Thử, xem thông báo thật và outbox; `partial/unknown/failed` phải kiểm riêng
+   từng máy. Nếu chỉ một máy nhận, không xóa/đăng ký lại cả hai máy cùng lúc.
+4. Telegram là kênh độc lập; PWA lỗi không được chặn nhận diện/STOP/còi.

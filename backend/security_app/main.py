@@ -32,6 +32,7 @@ from .contracts import (
 )
 from .push import (
     add_subscription,
+    enqueue_push_test,
     push_status,
     remove_subscription,
     valid_endpoint,
@@ -369,6 +370,10 @@ def create_app(config: dict | None = None) -> FastAPI:
         remove_subscription(s.store, body.endpoint)
         return Response(status_code=204)
 
+    @app.post("/api/v2/push/test", status_code=202, dependencies=[Depends(admin)])
+    def push_test(body: IdempotentAction, s: SecurityService = Depends(service)):
+        return enqueue_push_test(s, body.idempotency_key)
+
     @app.get("/push-media/{media_id}", include_in_schema=False)
     def push_media(
         media_id: str, exp: int, sig: str, request: Request, s: SecurityService = Depends(service)
@@ -378,6 +383,7 @@ def create_app(config: dict | None = None) -> FastAPI:
         signer = request.app.state.media_signer
         if (
             not s.cfg["notifications"]["push_enabled"]
+            or not s.cfg["notifications"]["push_include_image"]
             or not re.fullmatch(r"[0-9a-fA-F-]{32,40}", media_id)
             or not signer.verify(media_id, exp, sig)
         ):

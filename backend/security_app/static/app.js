@@ -34,7 +34,7 @@ const labels = {
   known_visit: "Người quen ở vùng cửa",
   visit_completed: "Kết quả lượt vừa kết thúc",
   notification_test: "Thử thông báo Telegram",
-  unknown_approach: "Người chưa đăng ký tiếp cận cửa",
+  unknown_approach: "Không khớp người đã đăng ký — báo động",
   unresolved_presence: "Cần kiểm tra người ở vùng cửa",
   capacity_exceeded: "Vượt phạm vi hai người",
   acked: "Thiết bị đã xác nhận",
@@ -100,9 +100,9 @@ function appendRecognitionDetails(row, result) {
   const reasons = quality.filter(key => counts[key] > 0).map(key => `${labels[key] || enrollmentFeedback[key] || "Chưa thấy mặt"} (${counts[key]} ảnh)`);
   if (reasons.length) row.append(node("p", `Trong lượt: ${reasons.join(" · ")}`));
   if (result.geometry_valid === false) {
-    row.append(node("p", "Chưa ghép chắc chắn mặt với thân người; chưa đủ điều kiện xác định chiều tiếp cận để báo động."));
+    row.append(node("p", "Chưa ghép chắc chắn mặt với thân người. Kết luận không khớp người đã đăng ký vẫn kích hoạt báo động."));
   } else if (result.direction === "UNRESOLVED") {
-    row.append(node("p", "Chưa xác nhận đường đi từ vùng A đến vùng B để báo động."));
+    row.append(node("p", "Chưa rõ chiều đi. Kết luận không khớp người đã đăng ký vẫn kích hoạt báo động."));
   }
 }
 
@@ -367,6 +367,8 @@ function logoutView() {
   $("logout").hidden = true;
   pushReady = false;
   $("push-toggle").hidden = true;
+  $("push-test").hidden = true;
+  $("push-help").hidden = true;
   $("connection").textContent = "Chưa đăng nhập";
 }
 
@@ -387,21 +389,43 @@ function renderPushToggle() {
   const button = $("push-toggle");
   button.hidden = false;
   button.textContent = pushSubscription ? "Tắt thông báo" : "Bật thông báo";
+  $("push-test").hidden = !pushSubscription;
 }
 
 async function setupPush() {
+  const epoch = viewEpoch;
   const button = $("push-toggle");
   button.hidden = true;
-  if (!pushSupported()) return;
+  const help = $("push-help");
+  help.hidden = false;
+  if (!pushSupported()) {
+    help.textContent = "iPhone: thêm web vào Màn hình chính rồi mở từ biểu tượng để bật thông báo. Android: dùng Chrome và cho phép thông báo.";
+    return;
+  }
   try {
     const config = await api("/push/config");
-    if (!config.enabled || !config.configured || !config.public_key) return;
+    if (!config.enabled || !config.configured || !config.public_key) {
+      help.textContent = "Thông báo PWA chưa sẵn sàng trên máy chủ.";
+      return;
+    }
     const registration = await navigator.serviceWorker.ready;
     pushSubscription = await registration.pushManager.getSubscription();
+    if (epoch !== viewEpoch || !csrf) return;
+    help.textContent = "Bật thông báo riêng trên từng điện thoại, rồi bấm Thử thông báo PWA để kiểm tra.";
+    if (pushSubscription) {
+      const { endpoint, keys } = pushSubscription.toJSON();
+      await api("/push/subscribe", "POST", {endpoint, keys});
+    }
+    if (epoch !== viewEpoch || !csrf) return;
     button.onclick = () => action(button, () => togglePush(registration, config.public_key));
+    $("push-test").onclick = e => action(e.target, async () => {
+      await api("/push/test", "POST", {idempotency_key: actionKey()});
+      show("Đã xếp hàng thông báo PWA thử; kiểm tra trên thiết bị đã cấp quyền.");
+    });
     renderPushToggle();
   } catch (e) {
     button.hidden = true;
+    if (epoch === viewEpoch && csrf) help.textContent = "Chưa kết nối được thông báo PWA. Tải lại ứng dụng rồi thử lại.";
   }
 }
 

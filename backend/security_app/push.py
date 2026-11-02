@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import secrets
+import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
@@ -15,6 +16,7 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from .notifications import dashboard_link
+from .runtime import DomainError
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +31,7 @@ PUSH_HOSTS = (
     "notify.windows.com",
 )
 REASONS = {
-    "unknown_approach": "CẢNH BÁO: khách chưa đăng ký tiếp cận cửa",
+    "unknown_approach": "CẢNH BÁO: không khớp người đã đăng ký",
     "unresolved_presence": "CẦN KIỂM TRA: chưa đủ căn cứ nhận diện",
     "capacity_exceeded": "CẦN KIỂM TRA: quá nhiều người trong vùng cửa",
     "known_visit": "Người đã đăng ký ghé cửa",
@@ -49,14 +51,13 @@ def b64url_decode(value: str) -> bytes:
 def valid_endpoint(endpoint: str) -> bool:
     if not isinstance(endpoint, str) or not 16 <= len(endpoint) <= 512:
         return False
-    parsed = urlsplit(endpoint)
-    host = parsed.hostname or ""
-    if (
-        parsed.scheme != "https"
-        or parsed.username
-        or parsed.password
-        or parsed.port not in (None, 443)
-    ):
+    try:
+        parsed = urlsplit(endpoint)
+        host = parsed.hostname or ""
+        port = parsed.port
+    except ValueError:
+        return False
+    if parsed.scheme != "https" or parsed.username or parsed.password or port not in (None, 443):
         return False
     return any(host == h or host.endswith("." + h) for h in PUSH_HOSTS)
 
@@ -125,12 +126,68 @@ def push_status(runtime: Path, cfg: dict) -> dict:
     n = cfg["notifications"]
     public_key = vapid_public_key(runtime)
     configured = bool(public_key and vapid_subject() and dashboard_link())
+    with sqlite3.connect((runtime / "security.sqlite3").as_uri() + "?mode=ro", uri=True) as db:
+        subscription_count = db.execute("SELECT COUNT(*) FROM push_subscriptions").fetchone()[0]
+        counts = dict(db.execute("SELECT state,COUNT(*) FROM push_outbox GROUP BY state"))
     return {
         "enabled": bool(n["push_enabled"]),
         "configured": configured,
         "public_key": public_key if n["push_enabled"] and configured else None,
         "max_subscriptions": MAX_SUBSCRIPTIONS,
+        "subscription_count": subscription_count,
+        "delivery_counts": counts,
     }
+
+
+def enqueue_push_test(service, key):
+    """Explicit text-only PWA test; no alarm or Telegram delivery."""
+    status = push_status(service.runtime, service.cfg)
+    if not status["enabled"] or not status["configured"]:
+        raise DomainError("PUSH_DISABLED", 409)
+    fingerprint = json.dumps(["push-test"])
+    now = datetime.now(timezone.utc)
+    with service.lock, service.store.connection() as db:
+        old = db.execute(
+            "SELECT fingerprint,response_json FROM action_keys WHERE key=?", (key,)
+        ).fetchone()
+        if old:
+            if old["fingerprint"] != fingerprint:
+                raise DomainError("IDEMPOTENCY_KEY_REUSED")
+            return json.loads(old["response_json"])
+        if not status["subscription_count"]:
+            raise DomainError("PUSH_NO_SUBSCRIBERS", 409)
+        recent = db.execute(
+            "SELECT 1 FROM events WHERE reason='notification_test' "
+            "AND json_extract(details_json,'$.channel')='push' "
+            "AND julianday(created_at)>julianday(?,'-30 seconds')",
+            (now.isoformat(),),
+        ).fetchone()
+        if recent:
+            raise DomainError("NOTIFICATION_TEST_RATE_LIMIT", 429)
+        event_id = str(uuid4())
+        response = {"event_id": event_id, "state": "pending"}
+        details = json.dumps({"test": True, "channel": "push", "audible": False})
+        db.execute(
+            "INSERT INTO events VALUES(?,?,?,?,?,?,?,?,NULL)",
+            (
+                event_id,
+                "push-test-" + event_id,
+                "notification_test",
+                "info",
+                now.isoformat(),
+                "system_test",
+                details,
+                None,
+            ),
+        )
+        db.execute(
+            "INSERT INTO push_outbox(event_id,created_at) VALUES(?,?)", (event_id, now.isoformat())
+        )
+        db.execute(
+            "INSERT INTO action_keys VALUES(?,?,?,?)",
+            (key, fingerprint, json.dumps(response), now.isoformat()),
+        )
+    return response
 
 
 class MediaSigner:
@@ -151,7 +208,12 @@ class MediaSigner:
 
     def verify(self, media_id: str, expires: int, signature: str, now: float | None = None) -> bool:
         now = time.time() if now is None else now
-        if not now < expires <= now + MAX_MEDIA_LINK_SECONDS:
+        if (
+            not isinstance(signature, str)
+            or len(signature) != 64
+            or any(c not in "0123456789abcdef" for c in signature)
+            or not now < expires <= now + MAX_MEDIA_LINK_SECONDS
+        ):
             return False
         return hmac.compare_digest(self.sign(media_id, expires), signature)
 
@@ -200,6 +262,8 @@ def send_web_push(subscription: dict, payload: dict, private_key: Path, subject:
         return "rejected"
     except (requests.RequestException, OSError):
         return "retry"
+    except (ValueError, TypeError):
+        return "rejected"
     finally:
         session.close()
 
@@ -211,13 +275,18 @@ class PushNotifier:
         self.service = service
         self.sender = sender
         self.signer = MediaSigner(service.runtime)
+        with service.store.connection() as db:
+            db.execute(
+                "UPDATE push_delivery SET state='unknown',reason='PROCESS_INTERRUPTED' "
+                "WHERE state='sending'"
+            )
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self.run, name="push-worker", daemon=True)
         self.thread.start()
 
     def close(self):
         self.stop_event.set()
-        self.thread.join(timeout=4)
+        self.thread.join(timeout=9)  # Finish the bounded 5s HTTP call and short DB write.
 
     def run(self):
         while not self.stop_event.wait(1):
@@ -253,10 +322,7 @@ class PushNotifier:
         else:
             state, reason = self.deliver(row, cfg, base, subject)
             if state == "pending":
-                if row["attempts"] + 1 >= cfg["max_attempts"]:
-                    state = "failed"
-                else:
-                    self.stop_event.wait(min(30, 2 ** (row["attempts"] + 1)))
+                self.stop_event.wait(min(30, 2 ** min(5, row["attempts"] + 1)))
         with self.service.store.connection() as db:
             db.execute(
                 "UPDATE push_outbox SET state=?,reason=?,attempts=attempts+1 WHERE event_id=?",
@@ -280,19 +346,62 @@ class PushNotifier:
         for sub in subs:
             if self.stop_event.is_set():
                 return "pending", "SHUTDOWN"
+            with self.service.store.connection() as db:
+                previous = db.execute(
+                    "SELECT state,attempts FROM push_delivery WHERE event_id=? AND subscription_id=?",
+                    (row["event_id"], sub["id"]),
+                ).fetchone()
+                if previous and previous["state"] in {"sent", "gone", "failed", "unknown"}:
+                    outcomes.append(previous["state"])
+                    continue
+                if previous and previous["state"] == "sending":
+                    outcomes.append("unknown")
+                    db.execute(
+                        "UPDATE push_delivery SET state='unknown',reason='PROCESS_INTERRUPTED' "
+                        "WHERE event_id=? AND subscription_id=?",
+                        (row["event_id"], sub["id"]),
+                    )
+                    continue
+                attempts = (previous["attempts"] if previous else 0) + 1
+                db.execute(
+                    "INSERT INTO push_delivery(event_id,subscription_id,state,attempts) "
+                    "VALUES(?,?,'sending',?) ON CONFLICT(event_id,subscription_id) "
+                    "DO UPDATE SET state='sending',attempts=excluded.attempts,reason=NULL",
+                    (row["event_id"], sub["id"], attempts),
+                )
             info = {
                 "endpoint": sub["endpoint"],
                 "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]},
             }
             outcome = self.sender(info, payload, key, subject, ttl)
-            outcomes.append(outcome)
-            if outcome == "gone":
-                with self.service.store.connection() as db:
+            delivery = (
+                "pending"
+                if outcome == "retry" and attempts < cfg["max_attempts"]
+                else "failed"
+                if outcome not in {"sent", "gone"}
+                else outcome
+            )
+            outcomes.append(delivery)
+            with self.service.store.connection() as db:
+                db.execute(
+                    "UPDATE push_delivery SET state=?,reason=? WHERE event_id=? AND subscription_id=?",
+                    (
+                        delivery,
+                        "DELIVERY_UNCONFIRMED" if outcome == "retry" else None,
+                        row["event_id"],
+                        sub["id"],
+                    ),
+                )
+                if outcome == "gone":
                     db.execute("DELETE FROM push_subscriptions WHERE id=?", (sub["id"],))
-        if "sent" in outcomes:
-            return "sent", None
-        if "retry" in outcomes:
+        if "pending" in outcomes:
             return "pending", "DELIVERY_UNCONFIRMED"
+        if outcomes and all(value == "sent" for value in outcomes):
+            return "sent", None
+        if "sent" in outcomes:
+            return "partial", "SOME_DEVICES_NOT_CONFIRMED"
+        if "unknown" in outcomes:
+            return "unknown", "DELIVERY_UNCONFIRMED"
         return "failed", "PROVIDER_REJECTED"
 
 

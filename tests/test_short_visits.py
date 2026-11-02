@@ -65,14 +65,16 @@ def test_expired_approach_identity_cannot_mark_doorstep_known(cfg):
     assert not any(e["reason"] == "known_visit" for e in events)
 
 
-def test_unknown_dwell_starts_at_first_continuous_b_evidence(cfg):
+def test_unknown_alarms_during_approach_and_does_not_wait_for_b_dwell(cfg):
     engine = PolicyEngine(cfg)
+    early = []
     for now in (0, 300, 600):
-        engine.ingest(str(now), now, [obs(A)])
+        early.extend(engine.ingest(str(now), now, [obs(A)]))
+    assert len([e for e in early if e["audible"]]) == 1
     for now in (900, 1200, 1500):
         assert not any(e["audible"] for e in engine.ingest(str(now), now, [obs(B)]))
     events = engine.ingest("b-ready", 1800, [obs(B)])
-    assert any(e["reason"] == "unknown_approach" and e["audible"] for e in events)
+    assert not any(e["audible"] for e in events)
 
 
 def test_missing_observation_restarts_pending_b_dwell(cfg):

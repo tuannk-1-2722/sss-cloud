@@ -28,12 +28,14 @@ def test_unknown_incoming_alarms_once_even_if_stays(cfg):
 
 
 @pytest.mark.parametrize("boxes", [[A] * 20, [STREET] * 20, [B] * 3 + [A] * 15])
-def test_passerby_far_and_outgoing_never_sound(cfg, boxes):
-    assert not any(e["audible"] for e in run(PolicyEngine(cfg), [[obs(b)] for b in boxes]))
+def test_passerby_far_and_outgoing_without_eligible_face_never_sound(cfg, boxes):
+    assert not any(
+        e["audible"] for e in run(PolicyEngine(cfg), [[obs(b, "NO_FACE")] for b in boxes])
+    )
 
 
 def test_direct_b_needs_direction_warning_not_siren(cfg):
-    events = run(PolicyEngine(cfg), [[obs(B)]] * 16)
+    events = run(PolicyEngine(cfg), [[obs(B, "NO_FACE")]] * 16)
     assert len(events) == 1 and events[0]["detail"] == "direction_unresolved"
     assert not events[0]["audible"]
 
@@ -50,7 +52,8 @@ def test_gap_longer_than_continuity_does_not_inherit_direction(cfg):
     events = []
     for i in range(15):
         events += engine.ingest(f"b{i}", 5000 + i * 500, [obs(B)])
-    assert not any(e["audible"] for e in events)
+    assert engine.tracks["one"].direction == "UNRESOLVED"
+    assert any(e["audible"] for e in events)
 
 
 def test_known_does_not_hide_unknown(cfg):
@@ -68,9 +71,9 @@ def test_unreadable_face_warns_without_unknown(cfg):
     assert not events[0]["audible"]
 
 
-def test_face_only_geometry_cannot_sound(cfg):
+def test_face_only_confirmed_unknown_sounds_without_body_gate(cfg):
     events = run(PolicyEngine(cfg), [[obs(A, valid=False)]] * 2 + [[obs(B, valid=False)]] * 16)
-    assert not any(e["audible"] for e in events)
+    assert len([e for e in events if e["audible"]]) == 1
 
 
 def test_duplicate_frame_cannot_add_confirmation(cfg):
@@ -83,7 +86,7 @@ def test_duplicate_frame_cannot_add_confirmation(cfg):
         assert engine.ingest("b1", 1500 + i * 500, [obs(B)]) == []
     assert list(engine.tracks["one"].votes) == votes
     assert engine.tracks["one"].stable_zone == "A"
-    assert not engine.tracks["one"].emitted
+    assert engine.tracks["one"].emitted == {"unknown_approach"}
 
 
 def test_identity_evidence_uses_distinct_frames_and_elapsed_time(cfg):
@@ -133,6 +136,6 @@ def test_global_cooldown_does_not_hide_second_event_or_delay_siren(cfg):
     for i in range(8):
         events += engine.ingest(f"new{i}", 4000 + i * 500, [obs(A if i < 2 else B, key="second")])
     alarms = [e for e in events if e["reason"] == "unknown_approach"]
-    assert len(alarms) == 2 and alarms[1]["suppression"] == "cooldown"
+    assert len(alarms) == 2 and all(e["audible"] and e["suppression"] is None for e in alarms)
     later = engine.ingest("later", 16000, [obs(B, key="second")])
     assert all(e["reason"] == "visit_completed" and not e["audible"] for e in later)

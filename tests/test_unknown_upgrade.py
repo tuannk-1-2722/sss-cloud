@@ -57,15 +57,16 @@ def test_known_after_unknown_confirmation_cancels_unknown_before_any_new_alarm(c
 
 
 @pytest.mark.parametrize("valid", [True, False])
-def test_faster_identity_does_not_shorten_dwell_or_give_face_only_alarm_authority(cfg, valid):
+def test_confirmed_unknown_triggers_before_b_dwell_for_body_or_face_only(cfg, valid):
     engine = PolicyEngine(cfg)
     engine.ingest("a0", 0, [obs(A, valid=valid)])
-    engine.ingest("a1", 400, [obs(A, valid=valid)])
+    confirmed = engine.ingest("a1", 400, [obs(A, valid=valid)])
     assert engine.tracks["one"].confirmed == "UNKNOWN"
+    assert any(e["audible"] for e in confirmed)
     for now in (700, 1100, 1499):
         assert not any(e["audible"] for e in engine.ingest(str(now), now, [obs(B, valid=valid)]))
     events = engine.ingest("dwell", 1500, [obs(B, valid=valid)])
-    assert any(e["audible"] for e in events) is valid
+    assert not any(e["audible"] for e in events)
 
 
 def test_unknown_expires_and_never_reuses_votes_from_previous_visit(cfg):

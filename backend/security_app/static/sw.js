@@ -1,5 +1,5 @@
 /* Static shell only. Never cache login, camera frames, events or biometric evidence. */
-const SHELL = "sss-static-v11";
+const SHELL = "sss-static-v12";
 const ASSETS = ["/static/app.css", "/static/camera-stream.js", "/static/app.js", "/static/icon-192.png", "/static/icon-512.png", "/manifest.webmanifest"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(ASSETS)));
@@ -19,6 +19,7 @@ self.addEventListener("fetch", event => {
 self.addEventListener("push", event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
+  if (!data || typeof data !== "object" || Array.isArray(data)) data = {};
   const text = (value, fallback, max) => typeof value === "string" && value ? value.slice(0, max) : fallback;
   const options = {
     body: text(data.body, "", 200),

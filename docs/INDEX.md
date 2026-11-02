@@ -1,5 +1,8 @@
 # Chỉ mục tài liệu — Smart Security System v2.1
 
+**Bản chốt demo 03/11:** [DEMO_RELEASE](DEMO_RELEASE.md) — AI đóng khung,
+UNKNOWN xác nhận → alarm ngay; PWA/Telegram cùng release.
+
 Nâng cấp đang thực hiện: [`RECOGNITION_UPGRADE.md`](RECOGNITION_UPGRADE.md) —
 quyết định đã duyệt cho lượt đến cửa ngắn, trace/pilot và gate nhận diện che mặt.
 Điều tra người lạ 02/11: [`UNKNOWN_RECOGNITION_REVIEW.md`](UNKNOWN_RECOGNITION_REVIEW.md) —

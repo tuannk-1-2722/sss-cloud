@@ -1,0 +1,49 @@
+{
+  "approval": "Operator confirmed live AI satisfactory on 2026-11-02; retain recognition and UNKNOWN2/400. Alarm eligibility separately changed to immediate-unknown-v1.",
+  "accuracy_or_hil_certified": false,
+  "vision": {
+    "recognition_region": [
+      0.05,
+      0.05,
+      0.9,
+      0.9
+    ],
+    "opencv_threads": 2,
+    "face_confidence": 0.9,
+    "monitoring_face_confidence": 0.8,
+    "face_nms": 0.3,
+    "person_confidence": 0.5,
+    "person_nms": 0.6,
+    "face_min_px": 80,
+    "enrollment_face_min_px": 100,
+    "blur_min": 60,
+    "monitoring_blur_min": 6,
+    "clipped_fraction_max": 0.4,
+    "accept": 0.45,
+    "reject": 0.3,
+    "margin": 0.08,
+    "track_iou": 0.15,
+    "track_center_distance": 0.25,
+    "ambiguity_margin": 0.1
+  },
+  "identity_policy": {
+    "confirm_votes": 3,
+    "confirmation_span_ms": 600,
+    "unknown_confirm_votes": 2,
+    "unknown_confirmation_span_ms": 400,
+    "strong_known_enabled": true,
+    "strong_known_min_score": 0.6,
+    "strong_known_min_margin": 0.16,
+    "strong_known_span_ms": 500,
+    "vote_window_ms": 4000,
+    "identity_fresh_ms": 2000
+  },
+  "source_sha256": {
+    "backend/security_app/vision.py": "99ba3df1783dc7119fd89817f1474ceb0fa76bdf310071f1b882c0eb1b5e8073",
+    "backend/security_app/matching.py": "59b3acb9c9de3b130f8cd7a945447ba40ee8b17634e59027750ca27a4166bbf6",
+    "backend/security_app/tracking.py": "a235bd5a195c0521f1a68f3108f75d34eb4c36ce2045b6259b180c0922c7952a",
+    "backend/security_app/enrollment.py": "615ab880ba570394d025b2f17e24ea5bdddef2b9d19e4b39138c17a5ddf94d92",
+    "models/manifest.json": "52de1be4c2d17dc9d206120958fa3a05db2f5c06fa952697d4ff7052075790e7"
+  },
+  "identity_vote_sha256": "28c375cc46a9d27e3c220a381c12b8581b5ee983d7825e90c647c30358d01ee2"
+}

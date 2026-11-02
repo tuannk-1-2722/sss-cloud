@@ -123,7 +123,7 @@ def validate_config(c: dict) -> None:
         raise ValueError("Approach and doorstep zones must not overlap")
     v, p, e, alarm, limits = (c[k] for k in ("vision", "policy", "enrollment", "alarm", "limits"))
     Rect(*v["recognition_region"])
-    if p["flow_version"] != "early-evidence-v2" or p["completed_history_limit"] > 100:
+    if p["flow_version"] != "immediate-unknown-v1" or p["completed_history_limit"] > 100:
         raise ValueError("Unsupported recognition flow or excessive completed visit history")
     q = c["environment"]
     if not 0 < q["min_median_luma"] < q["low_light_p95"] <= 255:

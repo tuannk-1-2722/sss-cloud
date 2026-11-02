@@ -22,6 +22,7 @@ def main():
         [sys.executable, "-m", "pytest", "-q"],
     ]
     if shutil.which("node"):
+        commands.append(["node", "--test", "tests/javascript/sw_push_test.cjs"])
         for name in ("app.js", "camera-stream.js", "sw.js"):
             commands.append(["node", "--check", f"backend/security_app/static/{name}"])
     else:

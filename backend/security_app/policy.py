@@ -195,13 +195,17 @@ class PolicyEngine:
                         and now - track.last_a_ms <= p["approach_history_ms"]
                         else "UNRESOLVED"
                     )
-                    track.visit_id = str(uuid4())
+                    # Preserve an UNKNOWN visit that already alarmed before reaching B.
+                    new_visit = track.visit_id is None or track.completed
+                    if new_visit:
+                        track.visit_id = str(uuid4())
                     track.entered_b, track.b_count = track.pending_since, 0
-                    track.completed = False
-                    track.result_identity, track.result_person_id = None, None
-                    track.identity_conflict = False
-                    track.emitted.clear()
-                    track.silenced = False
+                    if new_visit:
+                        track.completed = False
+                        track.result_identity, track.result_person_id = None, None
+                        track.identity_conflict = False
+                        track.emitted.clear()
+                        track.silenced = False
                 elif raw == "A" and old == "B":
                     track.direction = "OUTGOING"
                 elif raw == "OUTSIDE":
@@ -210,9 +214,32 @@ class PolicyEngine:
                         self._clear_evidence(track)
             if raw == "A" and track.stable_zone == "A" and observation.geometry_valid:
                 track.last_a_ms = now
-            # Identity can be established before reaching the lock; alarm geometry stays separate.
+            # Recognition is frozen; a confirmed UNKNOWN now alarms without geometry/dwell gates.
             if raw in {"A", "B"} or observation.identity_eligible:
                 self._vote(track, observation, now)
+            if track.confirmed == "UNKNOWN" and "unknown_approach" not in track.emitted:
+                if track.visit_id is None or track.completed:
+                    track.visit_id = str(uuid4())
+                    track.completed = False
+                    track.emitted.clear()
+                    track.silenced = False
+                track.emitted.add("unknown_approach")
+                track.result_identity, track.result_person_id = "UNKNOWN", None
+                audible = not track.silenced
+                if audible:
+                    self.last_alarm = now
+                decisions.append(
+                    {
+                        "visit_id": track.visit_id,
+                        "track_id": observation.track_id,
+                        "direction": track.direction,
+                        "person_id": None,
+                        "reason": "unknown_approach",  # Existing wire/event name retained.
+                        "severity": "alarm",
+                        "audible": audible,
+                        "suppression": "silenced" if track.silenced else None,
+                    }
+                )
             if raw != "B" or track.stable_zone != "B" or track.visit_id is None:
                 continue
             track.b_count += 1
@@ -227,37 +254,6 @@ class PolicyEngine:
                 track.emitted.add("known_visit")
                 decisions.append(
                     {**common, "reason": "known_visit", "severity": "info", "audible": False}
-                )
-            eligible = (
-                track.direction == "INCOMING"
-                and observation.geometry_valid
-                and now - track.entered_b >= p["doorstep_dwell_ms"]
-            )
-            if (
-                track.confirmed == "UNKNOWN"
-                and eligible
-                and "unknown_approach" not in track.emitted
-            ):
-                track.emitted.add("unknown_approach")
-                track.result_identity, track.result_person_id = "UNKNOWN", None
-                suppression = (
-                    "silenced"
-                    if track.silenced
-                    else "cooldown"
-                    if now - self.last_alarm < p["cooldown_ms"]
-                    else None
-                )
-                audible = suppression is None
-                if audible:
-                    self.last_alarm = now
-                decisions.append(
-                    {
-                        **common,
-                        "reason": "unknown_approach",
-                        "severity": "alarm",
-                        "audible": audible,
-                        "suppression": suppression,
-                    }
                 )
             unresolved = (
                 not observation.geometry_valid

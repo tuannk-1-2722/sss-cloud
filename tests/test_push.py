@@ -106,6 +106,8 @@ def ready_service(service, push_env):
         ("https://user:pw@fcm.googleapis.com/fcm/send/abcdefgh", False),
         ("https://fcm.googleapis.com:8443/fcm/send/abcdefgh", False),
         ("https://127.0.0.1/abcdefghijklmnop", False),
+        ("https://fcm.googleapis.com:bad/abcdefghijklmnop", False),
+        ("https://[broken/abcdefghijklmnop", False),
         ("https://fcm.googleapis.com/" + "a" * 600, False),
     ],
 )
@@ -165,6 +167,7 @@ def test_subscribe_rejects_bad_endpoint_keys_and_limit(client):
     headers = login(client)
     post = lambda payload: client.post("/api/v2/push/subscribe", json=payload, headers=headers)  # noqa: E731
     assert post(body("https://evil.example.org/x" + "a" * 20)).status_code == 422
+    assert post(body("https://fcm.googleapis.com:bad/abcdefghijklmnop")).status_code == 422
     bad = body()
     bad["keys"]["auth"] = b64url(os.urandom(21))
     assert post(bad).status_code == 422
@@ -225,6 +228,9 @@ def test_push_media_needs_valid_unexpired_signature(client):
     )
     service.cfg["notifications"]["push_enabled"] = False
     assert client.get(good).status_code == 404
+    service.cfg["notifications"]["push_enabled"] = True
+    service.cfg["notifications"]["push_include_image"] = False
+    assert client.get(good).status_code == 404
 
 
 def test_worker_sends_signed_image_and_never_embeds_jpeg(ready_service):
@@ -281,13 +287,103 @@ def test_worker_retry_is_bounded(ready_service):
     assert len(calls) == ready_service.cfg["notifications"]["max_attempts"]
 
 
-def test_worker_one_success_is_enough_and_not_retried(ready_service):
+def test_worker_retries_only_failed_device_when_other_device_already_received(ready_service):
     add_subscription(ready_service.store, ENDPOINT, P256DH, AUTH)
     add_subscription(ready_service.store, ENDPOINT + "-2", P256DH, AUTH)
     event_id, _ = add_event(ready_service)
-    results = iter(["sent", "retry"])
-    worker(ready_service, lambda *_: next(results)).step()
+    results = iter(["sent", "retry", "sent"])
+    calls = []
+    notifier = worker(
+        ready_service, lambda *args: calls.append(args[0]["endpoint"]) or next(results)
+    )
+    notifier.step()
+    assert outbox(ready_service, event_id)["state"] == "pending"
+    notifier.step()
     assert outbox(ready_service, event_id)["state"] == "sent"
+    assert calls == [ENDPOINT, ENDPOINT + "-2", ENDPOINT + "-2"]
+
+
+def test_one_failed_phone_does_not_drop_or_duplicate_the_other_phones_delivery(ready_service):
+    add_subscription(ready_service.store, ENDPOINT, P256DH, AUTH)
+    add_subscription(ready_service.store, ENDPOINT + "-2", P256DH, AUTH)
+    event_id, _ = add_event(ready_service)
+    calls = []
+    notifier = worker(
+        ready_service,
+        lambda info, *_: (
+            calls.append(info["endpoint"]) or ("sent" if info["endpoint"] == ENDPOINT else "retry")
+        ),
+    )
+    for _ in range(3):
+        notifier.step()
+    assert outbox(ready_service, event_id)["state"] == "partial"
+    assert calls.count(ENDPOINT) == 1 and calls.count(ENDPOINT + "-2") == 3
+
+
+def test_interrupted_delivery_is_not_silently_resent_after_restart(ready_service):
+    add_subscription(ready_service.store, ENDPOINT, P256DH, AUTH)
+    event_id, _ = add_event(ready_service)
+    with ready_service.store.connection() as db:
+        sid = db.execute("SELECT id FROM push_subscriptions").fetchone()[0]
+        db.execute("INSERT INTO push_delivery VALUES(?,?,'sending',1,NULL)", (event_id, sid))
+    calls = []
+    worker(ready_service, lambda *a: calls.append(a) or "sent").step()
+    assert not calls and outbox(ready_service, event_id)["state"] == "unknown"
+
+
+def test_slow_push_sender_does_not_hold_coordinator_lock_or_block_disarm(ready_service):
+    import threading
+
+    add_subscription(ready_service.store, ENDPOINT, P256DH, AUTH)
+    add_event(ready_service)
+    entered, release, disarmed = threading.Event(), threading.Event(), threading.Event()
+
+    def sender(*_):
+        entered.set()
+        assert release.wait(3)
+        return "sent"
+
+    thread = threading.Thread(target=worker(ready_service, sender).step)
+    thread.start()
+    try:
+        assert entered.wait(2)
+        stop = threading.Thread(
+            target=lambda: (
+                ready_service.set_mode("DISARMED", ready_service.mode_revision),
+                disarmed.set(),
+            )
+        )
+        stop.start()
+        assert disarmed.wait(1)
+        stop.join(1)
+        assert ready_service.command["type"] == "STOP_ALARM"
+    finally:
+        release.set()
+        thread.join(3)
+    assert not thread.is_alive()
+
+
+def test_pwa_test_requires_auth_csrf_and_is_idempotent_without_alarm_or_telegram(client):
+    data = {"idempotency_key": "push-test-key-001"}
+    assert client.post("/api/v2/push/test", json=data).status_code == 401
+    headers = login(client)
+    assert client.post("/api/v2/push/test", json=data).status_code == 403
+    assert client.post("/api/v2/push/test", json=data, headers=headers).status_code == 409
+    assert client.post("/api/v2/push/subscribe", json=body(), headers=headers).status_code == 201
+    first = client.post("/api/v2/push/test", json=data, headers=headers)
+    assert first.status_code == 202
+    assert client.post("/api/v2/push/test", json=data, headers=headers).json() == first.json()
+    assert (
+        client.post(
+            "/api/v2/push/test", json={"idempotency_key": "push-test-key-002"}, headers=headers
+        ).status_code
+        == 429
+    )
+    s = client.app.state.service
+    with s.store.connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM push_outbox").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM outbox").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM commands").fetchone()[0] == 0
 
 
 @pytest.mark.parametrize(

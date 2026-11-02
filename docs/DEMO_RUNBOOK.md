@@ -1,5 +1,10 @@
 # Chuẩn bị và chạy demo tại cửa
 
+**Quyết định chốt demo 03/11:** [DEMO_RELEASE](DEMO_RELEASE.md) là hướng dẫn
+hiện tại. UNKNOWN đã xác nhận phát alarm ngay, không cần A→B/body/dwell/cooldown;
+AI giữ bản operator đã test. PWA cho Android/iPhone theo [PUSH_SETUP](PUSH_SETUP.md).
+Những điều kiện A→B/cooldown trong kịch bản cũ dưới đây là lịch sử được thay thế.
+
 **Hiện trạng mới nhất 21:46 ngày 02/11:** bản giám sát blur6/confidence0.80 và
 UNKNOWN2ảnh/400ms đã được người dùng yêu cầu mở full luồng. Server đang ARMED,
 camera/AI/Telegram ready, profile `operator-approved-live-20261102`. Có thể test

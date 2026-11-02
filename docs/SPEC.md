@@ -59,13 +59,17 @@ trước publish; enrollment còn phải có viewer hướng dẫn và còn cầ
 
 **FR-06 — Geometry:** A=`zones.approach`, B=`zones.doorstep`; normalized rectangles `[x,y,w,h]`, không chồng, nằm trọn ảnh. Anchor là tâm bbox **thân người**. Đây không phải ước lượng mét/homography/sàn. Face-only có bbox để hiển thị/so mặt nhưng `geometry_valid=false`, không tạo bằng chứng incoming.
 
-Một raw zone phải đủ `stable_observations` liên tiếp trước thay stable zone. Đếm theo frame khác nhau. Nhận diện lấy bằng chứng trong `vision.recognition_region`, độc lập A/B, gồm cả đường tiếp cận và khe trung tính. `identity_eligible` cho biết observation nằm trong ROI này. Event tại cửa/còi vẫn cần raw và stable đều B; face-only không tạo incoming.
+Một raw zone phải đủ `stable_observations` liên tiếp trước thay stable zone. Đếm theo frame khác nhau. Nhận diện lấy bằng chứng trong `vision.recognition_region`, độc lập A/B, gồm cả đường tiếp cận và khe trung tính. `identity_eligible` cho biết observation nằm trong ROI này. Face-only không tạo incoming; theo quyết định chốt demo 02/11, UNKNOWN đã xác nhận phát alarm ngay, không cần B/body/incoming/dwell.
 
 **FR-07 — Direction:** trong một track liên tục, đã stable A với geometry hợp lệ rồi stable B khi bằng chứng A còn trong `approach_history_ms` → INCOMING. Khoảng trung tính giữa hai vùng được phép nếu track liên tục. B → A → OUTGOING. B xuất hiện trước khi có A → UNRESOLVED. Mất track quá `track_gap_ms`, association mơ hồ hoặc đổi body/face-only → track mới, không kế thừa chiều/known.
 
 **FR-08 — Visit:** stable entry B tạo `visit_id` UUID mới, reset emitted reasons, kết quả lượt và silence; giữ identity evidence còn mới đã thu trong ROI của cùng track trước khi đến cửa. Dwell tính từ raw B đầu tiên của chuỗi liên tục đã được xác nhận ổn định; mất observation trước stable entry bắt đầu lại chuỗi. Rời B ổn định thì đóng lượt và xóa evidence của lượt cũ; vào lại tạo lượt mới. Border bounce chưa stable không tạo lượt mới. Không có incident camera-wide để suppress mọi người mới khi còn người quen trong ảnh.
 
 Khi rời B ổn định, đổi geometry hoặc mất track quá `track_gap_ms`, ghi `visit_completed` đúng một lần, kể cả lượt không đủ `unresolved_warning_ms`. Kết quả là KNOWN/UNKNOWN/UNCERTAIN, kèm completion/quality reason. Kết quả đã phát trước đó được giữ như lịch sử; conflicting known IDs làm kết quả cuối uncertain. Hoàn tất lượt khi worker nhàn rỗi không tạo phiếu hay alarm mới. Inference hợp lệ của ảnh chụp trước khi người rời đi có thể COMMIT sau lúc họ rời ảnh, trong freshness/revision gates hiện có. STOP/disarm/session/gallery change vẫn vô hiệu kết quả cũ.
+
+Ngoại lệ chốt demo `immediate-unknown-v1`: nếu UNKNOWN được xác nhận trước B,
+tạo visit ngay và alarm một lần. Khi cùng track vào B, giữ visit/emitted này để
+không báo lặp; rời lượt ổn định, mất track/revision vẫn reset như trước.
 
 Mỗi lượt có thể có info/warning/alarm riêng; warning có thể nâng thành alarm trong cùng lượt. Mỗi `(visit_id,reason)` được ghi tối đa một lần, unique DB constraint bảo vệ retry. Track ID chỉ tạm trong runtime; không là định danh người lạ xuyên buổi/camera.
 
@@ -155,17 +159,21 @@ Samples lưu embedding/hash/quality/version/consent, **không lưu raw enrollmen
 
 **FR-16 — Policy table:**
 
-| Điều kiện ở B khi ARMED | Event reason / severity | Audible |
+| Điều kiện khi ARMED | Event reason / severity | Audible |
 |---|---|---|
 | Known confirmed | `known_visit` / info | false |
-| Incoming + geometry hợp lệ + dwell + unknown confirmed/fresh | `unknown_approach` / alarm | Một lần/lượt, tùy suppression |
+| UNKNOWN confirmed/fresh ở ROI, không cần B/chiều/body/dwell | `unknown_approach` / alarm (giữ tên wire tương thích) | Ngay khi xác nhận, một lần/lượt |
 | Hiện diện đủ warning interval/observations, direction/geometry/identity unresolved | `unresolved_presence` / warning, detail cụ thể | false |
 | Capacity vượt giới hạn ở A/B | `capacity_exceeded` / warning | false |
-| No observations, ngoài B, lỗi hoặc frame stale | Không alert danh tính | false |
+| No observations, chưa có kết luận UNKNOWN, lỗi hoặc frame stale | Không alarm danh tính | false |
 
 Direction chưa rõ vẫn có thể có known info; warning geometry/direction nếu hiện diện kéo dài không được dịch thành “người lạ”. History giữ alarm cũ khi sau đó mặt được nhận ra; không xóa evidence để làm kết quả đẹp.
 
-**FR-17 — Suppression:** cooldown toàn device và silence theo visit. Alert vẫn persist khi suppressed, có reason; không trì hoãn START để chờ cooldown. Pending STOP không bị alarm mới ghi đè: có event nhưng suppress `stop_pending` nếu STOP còn lease. Silence dừng âm vật lý hiện tại, không vô hiệu toàn bộ người mới; acknowledge không silence.
+**FR-17 — Suppression:** không áp cooldown cho một người lạ mới đã xác nhận;
+chống phát lặp bằng unique event/visit. `cooldown_ms` là key tương thích cũ.
+Silence theo visit và pending STOP vẫn có ưu tiên điều khiển chủ động; alert
+persist với reason `silenced`/`stop_pending`, không hẹn còi muộn. START/STOP,
+freshness/revision và hard OFF không đổi. Acknowledge không silence.
 
 **FR-18 — Delivery:** event + START record cùng transaction. Command ID/generation duy nhất; state pending → acked/rejected/expired/superseded/cancelled. Mode/boot/session/revision phải khớp. START deadline, hard cap, duplicate, late ACK và STOP theo CONTRACTS. HTTP 200 không thay execution ACK. DB transaction fail không được để START chưa persist vẫn tồn tại trong RAM để gửi.
 

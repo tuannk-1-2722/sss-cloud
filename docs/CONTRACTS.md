@@ -289,6 +289,14 @@ Các lỗi xác thực/validation không được echo `jpeg`, gallery, token. K
 
 ## Chẩn đoán nhận diện — 01/11/2026
 
+Chốt demo03/11: `unknown_approach` giữ nguyên wire name nhưng nghĩa là UNKNOWN
+confirmed → alarm ngay, không yêu cầu B/incoming/body/dwell/cooldown. Identity
+vẫn2ảnh/400ms, STOP/revision/freshness/COMMIT giữ nguyên. PWA bổ sung
+POST `/api/v2/push/test` (admin+CSRF, IdempotentAction,30s rate limit), chỉ xếp
+push text `system_test`, không gửi Telegram/còi. GET push/config thêm số thuê
+bao/outbox, không trả endpoint hoặc private key. Migration005 ghi delivery theo
+từng subscription, retry không gửi lại máy đã nhận; interrupted send là unknown.
+
 Cập nhật 02/11: status `tracks[]`, `recent_visits[]` và details của
 `visit_completed` thêm metadata tùy chọn `identity_reason`, `geometry_valid`,
 `identity_evidence={observation_counts,reason_counts,known_votes,unknown_votes}`.
