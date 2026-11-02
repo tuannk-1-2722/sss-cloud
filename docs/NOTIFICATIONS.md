@@ -159,5 +159,9 @@ luồng AI/thiết bị thực; không tự đánh dấu toàn bộ HIL đạt.
 - Người dùng đã xác nhận ghép bot/Start và nhận tin thử, ảnh, mở link web thành
   công. DB đối chiếu một `notification_test` gửi `photo`, một lần thử, có provider
   message ID, không đánh dấu khả năng trùng. Đây là kiểm chứng kênh thật.
-- Thông báo tự động từ lượt camera, màn hình khóa/mạng di động và thử lỗi mạng
-  thiết bị thực còn chờ xác nhận; unit test không thay nghiệm thu này.
+- Sau đó operator bật giám sát và thực hiện các lượt mặt rõ/khẩu trang, xác nhận
+  thông báo tự động **đúng loại, đúng ảnh, không lặp**. Đối chiếu DB tại 17:05:
+  hai `known_visit`, bốn `visit_completed` và một tin thử đã gửi ảnh thành công.
+  Đây là bằng chứng luồng Telegram của phiên demo, không phải số đo accuracy AI.
+- Màn hình khóa/mạng di động và thử lỗi mạng thiết bị thực chưa được xác nhận
+  riêng; unit test không thay nghiệm thu các điều kiện đó.
