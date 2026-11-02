@@ -39,6 +39,19 @@ AI/control và không làm STOP chờ provider. Signed image hết hạn/tắt �
 
 ## Kiểm chứng và giới hạn
 
+Đã triển khai source release `624e79b` lên `https://btliot05.duckdns.org` lúc
+22:28 ngày 02/11/2026 (giờ Việt Nam). Kiểm tra sau triển khai lúc 22:33: ARMED,
+camera online, AI ready, analysis enabled; không có lỗi worker/push hoặc traceback
+trong journal kể từ rollout. Gallery giữ nguyên 1 người active/10 mẫu. Push đã cấu
+hình, chưa có điện thoại đăng ký tại thời điểm kiểm tra. HTTPS ảnh ký hợp lệ trả
+JPEG/no-store; chữ ký sai và hết hạn trả 404.
+
+Software checks `python -m tools.check --http`: Windows 250 pass/2 skip POSIX;
+Linux 251 pass/1 skip Node không có trên máy kiểm tra. Ruff, HTTP/auth/video smoke,
+host C++ và Node UI/service worker đều pass ở môi trường tương ứng. AI freeze giữ
+nguyên snapshot 880a281. Người dùng chưa thể thử lại camera/còi và nhận thông báo
+trên hai điện thoại sau rollout; các phép thử thực tế này vẫn chờ xác nhận.
+
 Phải báo riêng software checks, native replay, operator live test và physical
 HIL/nhận trên hai điện thoại. Không gọi fixture synthetic, provider accepted,
 hoặc13JPEG replay là accuracy/HIL100%. Kết quả và manifest triển khai được ghi
