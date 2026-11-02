@@ -49,8 +49,10 @@ JPEG/no-store; chữ ký sai và hết hạn trả 404.
 Software checks `python -m tools.check --http`: Windows 250 pass/2 skip POSIX;
 Linux 251 pass/1 skip Node không có trên máy kiểm tra. Ruff, HTTP/auth/video smoke,
 host C++ và Node UI/service worker đều pass ở môi trường tương ứng. AI freeze giữ
-nguyên snapshot 880a281. Người dùng chưa thể thử lại camera/còi và nhận thông báo
-trên hai điện thoại sau rollout; các phép thử thực tế này vẫn chờ xác nhận.
+nguyên snapshot 880a281. Sau rollout, operator đã xác nhận thông báo và nhận diện
+hoạt động ổn; server cũng đã ghi nhận đăng ký Android và iPhone. Đây là xác nhận
+vận hành của operator, không phải báo cáo accuracy/HIL. Chưa có xác nhận riêng
+về độ trễ còi vật lý của rule mới hoặc thử tại mạng/địa điểm trường.
 
 Phải báo riêng software checks, native replay, operator live test và physical
 HIL/nhận trên hai điện thoại. Không gọi fixture synthetic, provider accepted,
