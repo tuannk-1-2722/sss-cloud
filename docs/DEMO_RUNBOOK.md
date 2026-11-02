@@ -1,5 +1,12 @@
 # Chuẩn bị và chạy demo tại cửa
 
+**Phạm vi đã duyệt 02/11:** một hồ sơ 10 mẫu đã active trên Oracle, calibration
+`doorstep-demo-v2-20261102-reviewed`. Clear nhận đúng; khẩu trang có thể chưa
+xác định và không còi. User chấp nhận mục người lạ PASS; test còi 1 giây cơ bản đã
+ACK/tự tắt. Trước buổi demo tải lại web, đăng nhập, kiểm device online/video rồi
+chủ động bật giám sát. Các bước đăng ký/review bên dưới dùng khi thay đổi setup
+hoặc chuẩn bị người mới; không cần đăng ký lại hồ sơ hiện tại.
+
 Topology đang dùng: ESP32-CAM gửi ảnh và telemetry tới Oracle. Backend, AI,
 gallery và lịch sử cùng ở VM; laptop/điện thoại mở dashboard. `inference=local`
 nghĩa là AI chạy trong VM. Model giữ NanoDet/YuNet/SFace; không dùng engine thử

@@ -1,5 +1,28 @@
 # Nhận diện lượt đến cửa ngắn — quyết định 01/11/2026
 
+## Review demo lúc 15:47 ngày 02/11/2026
+
+Đã chạy hai lượt test mới sau freeze với cùng model/profile/gallery. Mặt rõ có
+`known_visit` đúng hồ sơ; khẩu trang kết thúc `UNCERTAIN`. Cả hai có chiều
+INCOMING, không tên sai và không alarm. Độ phủ nhận đúng danh tính là **1/2**
+(clear 1/1, mask 0/1), không được báo thành accuracy 100%. Ảnh tạm Oracle đã xóa.
+
+Người dùng đã duyệt phạm vi demo: một người đã đăng ký, clear nhận đúng, mask
+được phép KNOWN hoặc UNCERTAIN và không còi; mục người lạ PASS theo xác nhận
+của người dùng. Người dùng cũng xác nhận test còi 1 giây kêu rồi tự tắt; server
+ghi TEST_ALARM 1000 ms đã ACK. Đây là kiểm tra còi cơ bản, chưa phải full fault HIL.
+
+Đã ghi profile `doorstep-demo-v2-20261102-reviewed` theo review này và kích hoạt
+hồ sơ 10 mẫu qua workflow hiện có. Calibration-check không lỗi, model/service
+ready, auth giữ nguyên; có backup profile cũ và report review trên Oracle.
+Limit gallery **1 người**. Không đổi policy/model/threshold sau khi xem holdout.
+Full fault HIL, hand/glasses riêng và latency vật lý chưa được đo trong review.
+
+Server restart về DISARMED; operator tải lại/đăng nhập và chủ động bật giám sát.
+Đổi góc camera/cấu hình/model hoặc thêm người vượt limit cần review lại.
+
+---
+
 ## Cập nhật 02/11/2026 — xác nhận người quen bằng cặp ảnh mạnh
 
 Người dùng yêu cầu tiếp tục tối ưu trên dữ liệu đã thu và chấp nhận mục người lạ

@@ -7,10 +7,12 @@ Gallery đang rỗng; calibration cũ cần duyệt lại nên chưa bật giám
 [chuẩn bị demo](docs/DEMO_RUNBOOK.md) và [kết quả kiểm chứng](docs/RECOGNITION_UPGRADE.md).
 Software pass không thay nghiệm thu accuracy, độ trễ hoặc còi thật.
 
-**Cập nhật02/11:** cloud có `early-evidence-v2`, thêm xác nhận người quen từ hai
-ảnh có điểm khớp mạnh. Đã có draft10mẫu; calibration vẫn cần review để kích hoạt.
-Validation camera clear/mask thu đủ nhận đúng với nhánh mới; đối chứng sau freeze
-và giới hạn đo được xem [RECOGNITION_UPGRADE](docs/RECOGNITION_UPGRADE.md).
+**Cập nhật 02/11:** cloud có `early-evidence-v2`, thêm xác nhận người quen từ hai
+ảnh có điểm khớp mạnh. Profile demo giới hạn một người đã được operator review;
+hồ sơ 10 mẫu đã active, calibration không còn lỗi. Đối chứng mới: clear nhận đúng,
+mask chưa xác định/không còi được chấp nhận. Test còi 1 giây có ACK/tự tắt. Tải lại
+web, đăng nhập rồi chủ động bật giám sát. Phạm vi đo xem
+[RECOGNITION_UPGRADE](docs/RECOGNITION_UPGRADE.md).
 
 **Ngày review:** 02/10/2026 · **Nhóm:** 3 người · **Deadline:** khoảng **tháng 11/2026**, chờ ngày nộp chính thức.
 

@@ -1,5 +1,11 @@
 # Kiểm chứng, calibration và demo
 
+Review demo 02/11 đã được operator chấp nhận: clear test 1/1 đúng; mask test chưa
+xác nhận KNOWN, trả UNCERTAIN/không alarm được chấp nhận trong phạm vi demo; unknown
+PASS theo operator. Test còi 1000 ms có ACK và operator xác nhận tự tắt. Profile
+`doorstep-demo-v2-20261102-reviewed`, limit 1 người, đã áp dụng; không đồng nghĩa
+toàn bộ mục tiêu G4/full HIL đã đạt. Xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md).
+
 Cập nhật02/11: `early-evidence-v2` thêm xác nhận known-only bằng hai ảnh mạnh;
 xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md). Local 158 test PASS, Linux 157 PASS/
 1skip, HTTP smoke PASS; validation native clear/mask thu đủ đúng2/2, chưa là
