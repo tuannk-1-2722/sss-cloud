@@ -365,7 +365,70 @@ function logoutView() {
   $("app").hidden = true;
   $("login-panel").hidden = false;
   $("logout").hidden = true;
+  pushReady = false;
+  $("push-toggle").hidden = true;
   $("connection").textContent = "Chưa đăng nhập";
+}
+
+/* Web Push: subscription lives in the browser; the server stores only the endpoint and keys. */
+let pushReady = false;
+let pushSubscription = null;
+
+function pushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+
+function urlBase64ToBytes(value) {
+  const raw = atob(value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "="));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+
+function renderPushToggle() {
+  const button = $("push-toggle");
+  button.hidden = false;
+  button.textContent = pushSubscription ? "Tắt thông báo" : "Bật thông báo";
+}
+
+async function setupPush() {
+  const button = $("push-toggle");
+  button.hidden = true;
+  if (!pushSupported()) return;
+  try {
+    const config = await api("/push/config");
+    if (!config.enabled || !config.configured || !config.public_key) return;
+    const registration = await navigator.serviceWorker.ready;
+    pushSubscription = await registration.pushManager.getSubscription();
+    button.onclick = () => action(button, () => togglePush(registration, config.public_key));
+    renderPushToggle();
+  } catch (e) {
+    button.hidden = true;
+  }
+}
+
+async function togglePush(registration, publicKey) {
+  if (pushSubscription) {
+    const endpoint = pushSubscription.endpoint;
+    await pushSubscription.unsubscribe();
+    pushSubscription = null;
+    await api("/push/unsubscribe", "POST", { endpoint });
+    show("Đã tắt thông báo trên thiết bị này.");
+  } else {
+    if (await Notification.requestPermission() !== "granted") throw new Error("Chưa được cấp quyền thông báo.");
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToBytes(publicKey)
+    });
+    try {
+      const { endpoint, keys } = subscription.toJSON();
+      await api("/push/subscribe", "POST", { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } });
+    } catch (e) {
+      await subscription.unsubscribe();
+      throw e;
+    }
+    pushSubscription = subscription;
+    show("Đã bật thông báo trên thiết bị này.");
+  }
+  renderPushToggle();
 }
 
 async function action(button, fn) {
@@ -496,6 +559,7 @@ async function refresh() {
     $("app").hidden = false;
     $("login-panel").hidden = true;
     $("logout").hidden = false;
+    if (!pushReady) { pushReady = true; setupPush(); }
     $("connection").textContent = current.device_online ? "Thiết bị online" : "Thiết bị offline";
     $("profile-banner").textContent = current.profile === "simulation" ? "ĐANG GIẢ LẬP — quan sát và còi không phải kết quả phần cứng hoặc độ chính xác AI." : "CAMERA THẬT — " + (current.calibration_error ? setupMessage(current.calibration_error) : current.active_people === 0 ? setupMessage("EMPTY_GALLERY") : "Hồ sơ hiệu chỉnh: " + current.calibration_id);
     $("mode-info").textContent = labels[current.mode] + (current.worker_error ? " · " + current.worker_error : "");

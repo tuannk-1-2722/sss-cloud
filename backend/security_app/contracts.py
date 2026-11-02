@@ -181,3 +181,17 @@ class NotificationTest(IdempotentAction):
 
 class Silence(IdempotentAction):
     visit_id: str
+
+
+class PushKeys(StrictModel):
+    p256dh: str = Field(min_length=80, max_length=100)
+    auth: str = Field(min_length=20, max_length=30)
+
+
+class PushSubscription(StrictModel):
+    endpoint: str = Field(max_length=512)
+    keys: PushKeys
+
+
+class PushUnsubscribe(StrictModel):
+    endpoint: str = Field(max_length=512)

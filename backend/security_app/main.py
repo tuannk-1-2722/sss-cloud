@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -23,9 +24,18 @@ from .contracts import (
     ModeChange,
     NotificationTest,
     PersonCreate,
+    PushSubscription,
+    PushUnsubscribe,
     Silence,
     Sync,
     SyntheticFrame,
+)
+from .push import (
+    add_subscription,
+    push_status,
+    remove_subscription,
+    valid_endpoint,
+    valid_key,
 )
 from .service import DomainError, SecurityService
 
@@ -87,6 +97,10 @@ def create_app(config: dict | None = None) -> FastAPI:
         from .notifications import Notifier
 
         notifier = Notifier(service)
+        from .push import MediaSigner, PushNotifier
+
+        app.state.media_signer = MediaSigner(service.runtime)
+        push_notifier = PushNotifier(service)
         cloud_bridge = None
         try:
             from .cloud_bridge import CloudBridge
@@ -95,6 +109,7 @@ def create_app(config: dict | None = None) -> FastAPI:
             yield
         finally:
             notifier.close()
+            push_notifier.close()
             if cloud_bridge is not None:
                 cloud_bridge.close()
             service.close()
@@ -329,6 +344,50 @@ def create_app(config: dict | None = None) -> FastAPI:
             if not path.is_file():
                 raise DomainError("MEDIA_NOT_FOUND", 404)
             return Response(path.read_bytes(), media_type="image/jpeg")
+
+    @app.get("/api/v2/push/config", dependencies=[Depends(admin)])
+    def push_config(s: SecurityService = Depends(service)):
+        return push_status(s.runtime, s.cfg)
+
+    @app.post("/api/v2/push/subscribe", status_code=201, dependencies=[Depends(admin)])
+    def push_subscribe(body: PushSubscription, s: SecurityService = Depends(service)):
+        status = push_status(s.runtime, s.cfg)
+        if not (status["enabled"] and status["configured"]):
+            raise DomainError("PUSH_DISABLED", 409)
+        if not (
+            valid_endpoint(body.endpoint)
+            and valid_key(body.keys.p256dh, 65)
+            and valid_key(body.keys.auth, 16)
+        ):
+            raise DomainError("PUSH_SUBSCRIPTION_INVALID", 422)
+        if not add_subscription(s.store, body.endpoint, body.keys.p256dh, body.keys.auth):
+            raise DomainError("PUSH_SUBSCRIPTION_LIMIT", 409)
+        return {"subscribed": True}
+
+    @app.post("/api/v2/push/unsubscribe", status_code=204, dependencies=[Depends(admin)])
+    def push_unsubscribe(body: PushUnsubscribe, s: SecurityService = Depends(service)):
+        remove_subscription(s.store, body.endpoint)
+        return Response(status_code=204)
+
+    @app.get("/push-media/{media_id}", include_in_schema=False)
+    def push_media(
+        media_id: str, exp: int, sig: str, request: Request, s: SecurityService = Depends(service)
+    ):
+        # Capability link for the OS notification image fetch: no cookie, HMAC + expiry only.
+        # Every failure is the same 404 so the endpoint reveals nothing about media ids.
+        signer = request.app.state.media_signer
+        if (
+            not s.cfg["notifications"]["push_enabled"]
+            or not re.fullmatch(r"[0-9a-fA-F-]{32,40}", media_id)
+            or not signer.verify(media_id, exp, sig)
+        ):
+            raise DomainError("MEDIA_NOT_FOUND", 404)
+        with s.store.connection() as db:
+            known = db.execute("SELECT 1 FROM events WHERE media_id=?", (media_id,)).fetchone()
+        path = s.runtime / "media" / f"{media_id}.jpg"
+        if not known or not path.is_file():
+            raise DomainError("MEDIA_NOT_FOUND", 404)
+        return Response(path.read_bytes(), media_type="image/jpeg")
 
     @app.get("/api/v2/latest-frame", dependencies=[Depends(admin)])
     def latest_frame(s: SecurityService = Depends(service)):

@@ -157,6 +157,12 @@ Hardware profile luôn từ chối synthetic observations. Dashboard giữ nhãn
 | `GET /commands` | 50 records gần nhất; state/ACK riêng |
 | `GET /latest-frame` | JPEG, X-Frame-Id, no-store; 404 chưa có |
 | `GET /media/{id}` | authenticated JPEG evidence, 404 thiếu/purged |
+| `GET /push/config` | `{enabled,configured,public_key,max_subscriptions}`; `public_key` null nếu tắt hoặc thiếu VAPID/subject/HTTPS URL |
+| `POST /push/subscribe` | `{endpoint,keys:{p256dh,auth}}` → 201; 409 `PUSH_DISABLED`/`PUSH_SUBSCRIPTION_LIMIT` (tối đa 10), 422 nếu endpoint không thuộc FCM/Mozilla/Apple/Windows push hoặc khóa sai độ dài |
+| `POST /push/unsubscribe` | `{endpoint}` → 204, idempotent |
+| `GET /push-media/{id}?exp&sig` (ngoài `/api/v2`, **không cookie**) | JPEG cho ảnh thông báo; HMAC-SHA256 + hết hạn ≤ 1 giờ; mọi lỗi đều 404 `MEDIA_NOT_FOUND`; 404 khi `push_enabled=false` |
+
+Web Push payload (mã hoá RFC 8291, < 1 KB): `{title,body,event_id,url,image?}`. Không nhúng JPEG; `image` là URL ký ở trên cùng origin dashboard. `push_outbox` ghi trong cùng transaction với `outbox`, worker riêng `push-worker`; 404/410 từ push service xoá subscription.
 
 Action key test/silence lưu DB 24h, cùng key khác fingerprint conflict; command + key persist atomically. Duplicate action trả kết quả cũ, không tạo lệnh mới. Thao tác khác dùng revision/resource state hoặc bản chất idempotent. Preview/enrollment đang active thì retry không tạo phiên thứ hai.
 

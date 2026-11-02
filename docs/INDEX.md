@@ -104,5 +104,6 @@ Nếu thời gian ít, ưu tiên hiểu bốn luồng này — đủ để bắt
 
 - **`docs/LEVEL3_UPGRADE.md`**: tài liệu bổ sung về level theo PDF môn học, kiến trúc cloud, PWA, Telegram/cloud.
 - **`docs/LEVEL3_SETUP_GUIDE.md`**: tài liệu hướng dẫn triển khai, cài đặt và vận hành hệ thống thực tế trên Oracle Cloud VM và ESP32.
+- **`docs/PUSH_SETUP.md`**: hướng dẫn bật Web Push kèm ảnh cho PWA trên máy chủ Oracle (`btliot05.duckdns.org`) và điện thoại.
 - **`docs/UPGRADE_AUDIT.md`**: mã đã thay, invariants được giữ, blocker và lệnh test.
 - Các tệp này **không thay thế** baseline SPEC/CONTRACTS; phần tính năng mới là opt-in cho đến nghiệm thu.

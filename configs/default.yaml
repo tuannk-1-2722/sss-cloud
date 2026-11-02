@@ -123,5 +123,8 @@ notifications:
   telegram_include_photos: false
   notify_known_visits: false
   notify_unresolved_visits: false
+  push_enabled: false
+  push_include_image: true
+  push_image_ttl_s: 600
   expiry_ms: 300000
   max_attempts: 3

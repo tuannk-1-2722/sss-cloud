@@ -108,6 +108,7 @@ class SecurityService:
 
         self.enrollment = EnrollmentManager(self)
         self.notification_error = None
+        self.push_error = None
         self.cloud_error = None
         self.sync_fingerprint = None
         from .video import VideoHub
@@ -699,6 +700,7 @@ class SecurityService:
             return {
                 "zones": self.cfg["zones"],
                 "notification_error": self.notification_error,
+                "push_error": self.push_error,
                 "notifications": notification_status(self),
                 "cloud_error": self.cloud_error,
                 "ui_limits": {
@@ -738,7 +740,8 @@ class SecurityService:
                 "capture": self.capture_status(),
                 "latest_analysis": self.latest_analysis,
                 "environment_quality": self.environment_quality,
-                "notifications_enabled": self.cfg["notifications"]["telegram_enabled"],
+                "notifications_enabled": self.cfg["notifications"]["telegram_enabled"]
+                or self.cfg["notifications"]["push_enabled"],
             }
 
     @storage_guard
@@ -792,8 +795,8 @@ class SecurityService:
         decisions = self.policy.ingest(packet.frame_id, observed, observations)
         if (
             self.cfg["notifications"]["telegram_include_photos"]
-            and self.cfg["notifications"]["notify_unresolved_visits"]
-        ):
+            or self.cfg["notifications"]["push_include_image"]
+        ) and self.cfg["notifications"]["notify_unresolved_visits"]:
             self.visit_evidence.update(self.policy.tracks, observations, packet, observed)
         if any(o.geometry_valid for o in observations):
             self.last_presence_ms = now
@@ -900,6 +903,10 @@ class SecurityService:
                         db.execute(
                             "INSERT OR IGNORE INTO outbox(id,event_id,state,attempts,created_at,reason) VALUES(?,?,'pending',0,?,NULL)",
                             (str(uuid4()), event_id, utcnow()),
+                        )
+                        db.execute(
+                            "INSERT OR IGNORE INTO push_outbox(event_id,created_at) VALUES(?,?)",
+                            (event_id, utcnow()),
                         )
             if not cursor.rowcount and media_id:
                 (self.runtime / "media" / f"{media_id}.jpg").unlink(missing_ok=True)
