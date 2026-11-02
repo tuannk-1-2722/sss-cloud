@@ -202,6 +202,11 @@ def validate_config(c: dict) -> None:
         raise ValueError("Capture leases must fit signed millis delta")
     if limits["max_decode_width"] < 640 or limits["max_decode_height"] < 480:
         raise ValueError("Decode limits must admit the camera profile")
+    n = c["notifications"]
+    if not 60 <= n["push_image_ttl_s"] <= 3600:
+        raise ValueError("notifications.push_image_ttl_s must be 60..3600")
+    if n["push_image_ttl_s"] * 1000 < n["expiry_ms"]:
+        raise ValueError("Push image link must outlive the alert expiry")
 
 
 def calibration_status(config: dict) -> tuple[dict, str | None]:

@@ -6,6 +6,25 @@ websockets==16.0
 #
 #    pip-compile --no-index --output-file=smart-security-system-v2/requirements-dev.txt smart-security-system-v2/requirements-dev.in
 #
+charset-normalizer==3.5.2
+    # via requests
+cryptography==50.0.2
+    # via
+    #   http-ece
+    #   py-vapid
+    #   pywebpush
+http-ece==1.2.1
+    # via pywebpush
+py-vapid==1.9.6
+    # via pywebpush
+pywebpush==1.14.1
+    # via -r smart-security-system-v2/requirements.in
+requests==2.34.2
+    # via pywebpush
+six==1.17.0
+    # via pywebpush
+urllib3==2.8.0
+    # via requests
 annotated-doc==0.0.5
     # via fastapi
 annotated-types==0.8.0
