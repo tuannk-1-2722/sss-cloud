@@ -1,5 +1,11 @@
 # Chỉ mục tài liệu — Smart Security System v2.1
 
+Nâng cấp đang thực hiện: [`RECOGNITION_UPGRADE.md`](RECOGNITION_UPGRADE.md) —
+quyết định đã duyệt cho lượt đến cửa ngắn, trace/pilot và gate nhận diện che mặt.
+Chuẩn bị và thao tác tại trường: [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md).
+Thông báo điện thoại: [`NOTIFICATIONS.md`](NOTIFICATIONS.md) — Telegram, ảnh,
+sự kiện ngắn/người quen, retry, thiết lập bí mật và kiểm nhận trên điện thoại.
+
 **Đọc file này trước**, sau đó mở đúng tài liệu cần thiết theo task. Không cần nạp
 toàn bộ `docs/` mỗi lần; thứ tự ưu tiên dưới đây cho biết khi nào cần đọc gì.
 
@@ -96,5 +102,6 @@ Nếu thời gian ít, ưu tiên hiểu bốn luồng này — đủ để bắt
 
 - **`docs/LEVEL3_UPGRADE.md`**: tài liệu bổ sung về level theo PDF môn học, kiến trúc cloud, PWA, Telegram/cloud.
 - **`docs/LEVEL3_SETUP_GUIDE.md`**: tài liệu hướng dẫn triển khai, cài đặt và vận hành hệ thống thực tế trên Oracle Cloud VM và ESP32.
+- **`docs/PUSH_SETUP.md`**: hướng dẫn bật Web Push kèm ảnh cho PWA trên máy chủ Oracle (`btliot05.duckdns.org`) và điện thoại.
 - **`docs/UPGRADE_AUDIT.md`**: mã đã thay, invariants được giữ, blocker và lệnh test.
 - Các tệp này **không thay thế** baseline SPEC/CONTRACTS; phần tính năng mới là opt-in cho đến nghiệm thu.

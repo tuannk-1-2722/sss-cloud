@@ -1,7 +1,8 @@
+import numpy as np
 import pytest
 from security_app.config import validate_config
 from security_app.matching import match, normalize
-from security_app.vision import ConservativeTracker
+from security_app.vision import ConservativeTracker, OpenCVVision
 
 
 def test_empty_gallery_does_not_call_everyone_unknown(cfg):
@@ -38,3 +39,24 @@ def test_invalid_configuration_fails_before_run(cfg):
     cfg["zones"]["doorstep"] = cfg["zones"]["approach"]
     with pytest.raises(ValueError):
         validate_config(cfg)
+
+
+def test_early_recognition_uses_numpy_bbox_and_exports_a_strict_boolean(cfg):
+    from test_policy import A
+
+    vision = OpenCVVision.__new__(OpenCVVision)
+    vision.cfg = cfg
+    vision.tracker = ConservativeTracker(cfg)
+    box = tuple(np.float64(value) for value in A)
+    face = np.array(
+        [80, 130, 100, 100, 100, 160, 140, 160, 120, 180, 105, 205, 135, 205, 0.99], np.float32
+    )
+    vision.decode = lambda _: np.full((480, 640, 3), 120, np.uint8)
+    vision.detections = lambda _: ([box], [face])
+    vision.quality = lambda *_: (np.zeros((112, 112, 3), np.uint8), {"min_side_px": 100})
+    vector = np.eye(1, 128, dtype=np.float32).reshape(-1)
+    vision.feature = lambda _: vector
+    result = vision.analyze(b"synthetic-fixture", {"person": [vector]}, 0)
+    assert result[0].decision == "KNOWN"
+    assert result[0].identity_eligible is True
+    assert result[0].evidence.s1 == 1

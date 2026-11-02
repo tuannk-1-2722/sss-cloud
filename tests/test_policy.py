@@ -78,19 +78,22 @@ def test_duplicate_frame_cannot_add_confirmation(cfg):
     engine.ingest("a1", 0, [obs(A)])
     engine.ingest("a2", 500, [obs(A)])
     engine.ingest("b1", 1000, [obs(B)])
+    votes = list(engine.tracks["one"].votes)
     for i in range(10):
         assert engine.ingest("b1", 1500 + i * 500, [obs(B)]) == []
-    assert not any(t.confirmed == "UNKNOWN" for t in engine.tracks.values())
+    assert list(engine.tracks["one"].votes) == votes
+    assert engine.tracks["one"].stable_zone == "A"
+    assert not engine.tracks["one"].emitted
 
 
 def test_identity_evidence_uses_distinct_frames_and_elapsed_time(cfg):
     engine = PolicyEngine(cfg)
-    engine.ingest("a0", 0, [obs(A)])
-    engine.ingest("a1", 100, [obs(A)])
-    for now in range(200, 900, 100):
+    engine.ingest("a0", 0, [obs(A, "NOT_CHECKED")])
+    engine.ingest("a1", 100, [obs(A, "NOT_CHECKED")])
+    for now in range(200, 800, 100):
         engine.ingest(f"b{now}", now, [obs(B)])
         assert engine.tracks["one"].confirmed == "UNCERTAIN"
-    engine.ingest("b900", 900, [obs(B)])
+    engine.ingest("b800", 800, [obs(B)])
     assert engine.tracks["one"].confirmed == "UNKNOWN"
 
 
@@ -100,7 +103,7 @@ def test_250ms_ai_results_are_not_discarded_by_legacy_vote_spacing(cfg):
     engine.ingest("a1", 250, [obs(A)])
     for now in [500, 750, 1000, 1250]:
         engine.ingest(f"b{now}", now, [obs(B)])
-    assert [v[0] for v in engine.tracks["one"].votes] == [750, 1000, 1250]
+    assert [v[0] for v in engine.tracks["one"].votes] == [0, 250, 500, 750, 1000, 1250]
 
 
 def test_new_arrival_when_known_person_stays_has_new_alarm(cfg):
@@ -131,4 +134,5 @@ def test_global_cooldown_does_not_hide_second_event_or_delay_siren(cfg):
         events += engine.ingest(f"new{i}", 4000 + i * 500, [obs(A if i < 2 else B, key="second")])
     alarms = [e for e in events if e["reason"] == "unknown_approach"]
     assert len(alarms) == 2 and alarms[1]["suppression"] == "cooldown"
-    assert engine.ingest("later", 16000, [obs(B, key="second")]) == []
+    later = engine.ingest("later", 16000, [obs(B, key="second")])
+    assert all(e["reason"] == "visit_completed" and not e["audible"] for e in later)

@@ -59,11 +59,13 @@ trước publish; enrollment còn phải có viewer hướng dẫn và còn cầ
 
 **FR-06 — Geometry:** A=`zones.approach`, B=`zones.doorstep`; normalized rectangles `[x,y,w,h]`, không chồng, nằm trọn ảnh. Anchor là tâm bbox **thân người**. Đây không phải ước lượng mét/homography/sàn. Face-only có bbox để hiển thị/so mặt nhưng `geometry_valid=false`, không tạo bằng chứng incoming.
 
-Một raw zone phải đủ `stable_observations` liên tiếp trước thay stable zone. Đếm theo frame khác nhau. Nhận diện mặt chỉ chạy khi raw anchor ở B; quyết định policy chỉ chạy khi raw và stable đều B.
+Một raw zone phải đủ `stable_observations` liên tiếp trước thay stable zone. Đếm theo frame khác nhau. Nhận diện lấy bằng chứng trong `vision.recognition_region`, độc lập A/B, gồm cả đường tiếp cận và khe trung tính. `identity_eligible` cho biết observation nằm trong ROI này. Event tại cửa/còi vẫn cần raw và stable đều B; face-only không tạo incoming.
 
 **FR-07 — Direction:** trong một track liên tục, đã stable A với geometry hợp lệ rồi stable B khi bằng chứng A còn trong `approach_history_ms` → INCOMING. Khoảng trung tính giữa hai vùng được phép nếu track liên tục. B → A → OUTGOING. B xuất hiện trước khi có A → UNRESOLVED. Mất track quá `track_gap_ms`, association mơ hồ hoặc đổi body/face-only → track mới, không kế thừa chiều/known.
 
-**FR-08 — Visit:** stable entry B tạo `visit_id` UUID mới, reset votes, confirmations, emitted reasons và silence. Rời B ổn định rồi vào lại tạo lượt mới. Border bounce chưa stable không tạo lượt mới. Không có incident camera-wide để suppress mọi người mới khi còn người quen trong ảnh.
+**FR-08 — Visit:** stable entry B tạo `visit_id` UUID mới, reset emitted reasons, kết quả lượt và silence; giữ identity evidence còn mới đã thu trong ROI của cùng track trước khi đến cửa. Dwell tính từ raw B đầu tiên của chuỗi liên tục đã được xác nhận ổn định; mất observation trước stable entry bắt đầu lại chuỗi. Rời B ổn định thì đóng lượt và xóa evidence của lượt cũ; vào lại tạo lượt mới. Border bounce chưa stable không tạo lượt mới. Không có incident camera-wide để suppress mọi người mới khi còn người quen trong ảnh.
+
+Khi rời B ổn định, đổi geometry hoặc mất track quá `track_gap_ms`, ghi `visit_completed` đúng một lần, kể cả lượt không đủ `unresolved_warning_ms`. Kết quả là KNOWN/UNKNOWN/UNCERTAIN, kèm completion/quality reason. Kết quả đã phát trước đó được giữ như lịch sử; conflicting known IDs làm kết quả cuối uncertain. Hoàn tất lượt khi worker nhàn rỗi không tạo phiếu hay alarm mới. Inference hợp lệ của ảnh chụp trước khi người rời đi có thể COMMIT sau lúc họ rời ảnh, trong freshness/revision gates hiện có. STOP/disarm/session/gallery change vẫn vô hiệu kết quả cũ.
 
 Mỗi lượt có thể có info/warning/alarm riêng; warning có thể nâng thành alarm trong cùng lượt. Mỗi `(visit_id,reason)` được ghi tối đa một lần, unique DB constraint bảo vệ retry. Track ID chỉ tạm trong runtime; không là định danh người lạ xuyên buổi/camera.
 
@@ -90,6 +92,19 @@ vote_spacing_ms cũ chỉ giữ để đọc config tương thích, không đi�
 Conflicting known IDs reset; unknown cần không có known ID trong cửa sổ.
 Uncertain/no-face không thành unknown. Identity hết freshness thì uncertain.
 Geometry/tracking/policy dùng cùng observed time, TTL lệnh dùng clock hiện tại.
+
+Bằng chứng ROI trước B vẫn phải đủ số phiếu/span/freshness, không hạ ngưỡng matching vì hành động ngắn. Kết quả KNOWN của lượt đã ghi không bị xóa khỏi lịch sử khi ảnh sau mất mặt; identity hiện tại có thể hết freshness. `policy.flow_version` và ROI thuộc hash calibration, thay đổi đòi review profile. Model vẫn NanoDet/YuNet/SFace 128d trong bản nâng cấp này; ứng viên InsightFace tạm hoãn theo quyết định người dùng.
+
+`early-evidence-v2` thêm nhánh known-only `strong_known_enabled`: hai observation
+KNOWN cùng người đã qua quality, có `evidence.s1 >= strong_known_min_score` và
+margin tới người thứ hai ít nhất `strong_known_min_margin` (nếu có), trải ít nhất
+`strong_known_span_ms`. Nhánh này không nhận evidence thiếu score, không trộn
+danh tính và không có UNKNOWN trong cửa sổ. Mặc định seed score 0.60, margin 0.16,
+span 500 ms; phải chặt hơn matching thường. UNKNOWN và đường xác nhận thường vẫn
+giữ `confirm_votes`/`confirmation_span_ms` cũ. Duplicate, evidence hết hạn, reset,
+reentry và revision vẫn giữ nguyên; UNKNOWN mâu thuẫn sau xác nhận rút gọn hủy
+xác nhận đó và làm kết quả cuối chưa xác định. Không cộng phiếu NO_FACE/UNCERTAIN.
+Các tham số này thuộc calibration hash, không dùng profile cũ để tự bật hardware.
 
 Gallery rỗng hoặc model/calibration lỗi chặn arm; không gọi mọi người là unknown. Threshold trong default là seed. Hardware arm cần validated profile đúng camera/config/model manifest và có report/reviewer.
 
@@ -134,7 +149,14 @@ Direction chưa rõ vẫn có thể có known info; warning geometry/direction n
 
 **FR-19 — Local alarm:** independent task kiểm deadline, không đợi upload/network. OFF khi boot/disarm/enrollment/mất control; test tối đa test cap khi DISARMED. GPIO owner duy nhất, active level theo module thực. Queue ACK bounded; overflow đưa OFF và phải có HIL report. Không cấp công suất buzzer từ GPIO.
 
-**EX-01 — Telegram:** text-only outbox unique event, disabled mặc định. HTTP timeout/retry/backoff có hạn; HTTP 429 theo retry_after có trần chờ. Alert quá expiry skipped/expired. Delivery timeout không bảo đảm exactly-once; state unknown sau hết retry. Không gửi ảnh face/token qua log; không điều khiển arm từ bot. Extension lỗi không làm core chờ.
+**EX-01 — Telegram:** outbox unique event, disabled mặc định. Text và ảnh opt-in
+qua consent riêng; warning/alarm luôn thuộc loại gửi, known và completion chưa
+xác định có cờ riêng, tránh lặp completion sau cảnh báo của cùng visit. Retry có
+lịch lưu bền, max attempts/expiry; HTTP429 theo retry_after cho cả chat. Timeout
+có thể gây trùng khi retry; crash/lỗi lưu trạng thái lúc gửi phải báo unknown.
+Provider sent không phải phone read. Không log token/ảnh/vector, không điều khiển
+ARM từ bot, không giữ coordinator lock trong HTTP. Migration003 và chi tiết
+photo/queue/test ở [NOTIFICATIONS](NOTIFICATIONS.md).
 
 ## 7. Dữ liệu và bảo vệ
 

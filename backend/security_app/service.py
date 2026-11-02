@@ -17,6 +17,8 @@ from PIL import Image
 
 from .config import calibration_status, ensure_runtime_profile
 from .contracts import FrameMeta, Hello, Observation, Sync, VideoMeta
+from .event_evidence import VisitEvidence
+from .notifications import should_notify
 from .policy import PolicyEngine
 from .ports import VisionPort
 from .runtime import DomainError as DomainError
@@ -66,6 +68,11 @@ class SecurityService:
         self.stopping = False
         self.mode, self.mode_revision, self.gallery_revision = "DISARMED", 1, 1
         self.policy = PolicyEngine(config)
+        self.visit_evidence = VisitEvidence(
+            config["policy"]["max_simultaneous"],
+            config["limits"]["max_frame_bytes"],
+            config["policy"]["vote_window_ms"],
+        )
         self.session_id = None
         self.boot_id = None
         self.source = "simulator" if config["profile"] == "simulation" else "hardware"
@@ -79,6 +86,9 @@ class SecurityService:
         self.sync_cache = None
         self.pending: Packet | None = None
         self.processing = False
+        from .diagnostics import RecognitionDiagnostics
+
+        self.diagnostics = RecognitionDiagnostics(**config["diagnostics"])
         self.latest_analysis: dict | None = None
         self.environment_quality: dict | None = None
         self.generation = 0
@@ -98,6 +108,7 @@ class SecurityService:
 
         self.enrollment = EnrollmentManager(self)
         self.notification_error = None
+        self.push_error = None
         self.cloud_error = None
         self.sync_fingerprint = None
         from .video import VideoHub
@@ -128,6 +139,7 @@ class SecurityService:
 
     def close(self):
         with self.condition:
+            self.visit_evidence.clear()
             self.stopping = True
             self.condition.notify_all()
             self.video.notify()
@@ -308,6 +320,7 @@ class SecurityService:
         self.environment_quality = None
         self.last_presence_ms = 0
         self.policy.reset()
+        self.visit_evidence.clear()
         self.worker_error = reason
         self.video._sampling_changed()
         try:
@@ -332,6 +345,7 @@ class SecurityService:
         self.mode, self.mode_revision = "DISARMED", self.mode_revision + 1
         self.command = None
         self.policy.reset()
+        self.visit_evidence.clear()
         self._cancel_pending()
         if self.capture_session and self.capture_session["purpose"] == "enrollment":
             with self.store.connection() as db:
@@ -389,6 +403,7 @@ class SecurityService:
                     raise DomainError("DEVICE_OFFLINE")
                 self.mode, self.mode_revision = "ARMED", self.mode_revision + 1
                 self.policy.reset()
+                self.visit_evidence.clear()
                 self._cancel_pending()
                 self.latest_analysis = None
                 self.last_presence_ms = 0
@@ -585,6 +600,17 @@ class SecurityService:
                 # Choosing the earliest estimate includes measurable WAN/queue delay.
                 observed = min(observed, meta.captured_uptime_ms + min(self.device_clock_offsets))
             capture_age = max(0, received - observed)
+            self.diagnostics.record(
+                "capture_rejected" if self.now() - observed > 1000 else "ingress",
+                self.now(),
+                frame_seq=meta.seq,
+                observed_ms=observed,
+                received_ms=received,
+                capture_age_ms=capture_age,
+                reported_capture_age_ms=meta.capture_age_ms,
+                validation_ms=max(0, self.now() - received),
+                mode_revision=meta.mode_revision,
+            )
             if self.now() - observed > 1000:
                 raise DomainError("CAPTURE_TOO_OLD", 422)
             self._upload_token(self.now())
@@ -634,6 +660,14 @@ class SecurityService:
             }
 
     def receipt(self, packet: Packet, state: str, reason: str | None = None):
+        self.diagnostics.record(
+            state,
+            self.now(),
+            frame_seq=packet.meta.seq,
+            reason=reason,
+            mode_revision=packet.meta.mode_revision,
+            gallery_revision=packet.gallery_revision,
+        )
         if packet.durable_receipt:
             self._receipt_state(packet.frame_id, state, reason)
 
@@ -650,11 +684,14 @@ class SecurityService:
         ):
             if self.worker_error != "ANALYSIS_INTERRUPTED":
                 self.policy.reset()
+                self.visit_evidence.clear()
             self.worker_error = "ANALYSIS_INTERRUPTED"
             self.last_presence_ms = 0
 
     def status(self) -> dict:
         with self.lock:
+            from .notifications import status as notification_status
+
             self._expire_capture()
             now = clock_ms()
             self._check_health(now)
@@ -663,6 +700,8 @@ class SecurityService:
             return {
                 "zones": self.cfg["zones"],
                 "notification_error": self.notification_error,
+                "push_error": self.push_error,
+                "notifications": notification_status(self),
                 "cloud_error": self.cloud_error,
                 "ui_limits": {
                     "test_cap_ms": self.cfg["alarm"]["test_cap_ms"],
@@ -670,6 +709,7 @@ class SecurityService:
                 },
                 "video": {**self.video.metrics(), **self.video.demand(), **self.cfg["video"]},
                 "analysis": self.analysis_metrics(now),
+                "diagnostics": self.diagnostics.snapshot(now, include_records=False),
                 "device_telemetry": self.device_telemetry,
                 "profile": self.cfg["profile"],
                 "source": self.source,
@@ -696,10 +736,12 @@ class SecurityService:
                 "pending_frame": bool(self.pending),
                 "frames_replaced": self.dropped,
                 "tracks": self.policy.snapshot(),
+                "recent_visits": self.policy.recent_visits,
                 "capture": self.capture_status(),
                 "latest_analysis": self.latest_analysis,
                 "environment_quality": self.environment_quality,
-                "notifications_enabled": self.cfg["notifications"]["telegram_enabled"],
+                "notifications_enabled": self.cfg["notifications"]["telegram_enabled"]
+                or self.cfg["notifications"]["push_enabled"],
             }
 
     @storage_guard
@@ -751,8 +793,31 @@ class SecurityService:
             else packet.received_ms - packet.meta.capture_age_ms
         )
         decisions = self.policy.ingest(packet.frame_id, observed, observations)
+        if (
+            self.cfg["notifications"]["telegram_include_photos"]
+            or self.cfg["notifications"]["push_include_image"]
+        ) and self.cfg["notifications"]["notify_unresolved_visits"]:
+            self.visit_evidence.update(self.policy.tracks, observations, packet, observed)
         if any(o.geometry_valid for o in observations):
             self.last_presence_ms = now
+        self._commit_decisions(packet, decisions, previous_alarm)
+        self.latest_analysis = {
+            "frame_id": packet.frame_id,
+            "source": self.source,
+            "observations": [o.model_dump() for o in observations],
+            "processed_at": utcnow(),
+        }
+        self.last_analysis_ms = now
+        self.worker_error = None
+
+    def _finish_visits(self):
+        if self.mode != "ARMED":
+            return
+        decisions = self.policy.advance(self.now())
+        self._commit_decisions(None, decisions, self.policy.last_alarm)
+
+    def _commit_decisions(self, packet, decisions, previous_alarm):
+        now = clock_ms()
         for decision in decisions:
             if (
                 decision["audible"]
@@ -763,20 +828,40 @@ class SecurityService:
                 decision["audible"], decision["suppression"] = False, "stop_pending"
                 self.policy.last_alarm = previous_alarm
             event_id, media_id = str(uuid4()), None
-            if packet.jpeg:
+            evidence = (
+                self.visit_evidence.take(
+                    decision["visit_id"], self.mode_revision, self.gallery_revision
+                )
+                if decision["reason"] == "visit_completed"
+                else None
+            )
+            if decision.get("identity") not in {"UNCERTAIN", "UNKNOWN"}:
+                evidence = None
+            jpeg = (
+                evidence.jpeg
+                if evidence
+                else packet.jpeg
+                if packet and decision["reason"] != "visit_completed"
+                else None
+            )
+            if evidence:
+                decision.update(
+                    evidence_frame_id=evidence.frame_id, evidence_observed_ms=evidence.observed_ms
+                )
+            if jpeg:
                 media_id = str(uuid4())
                 try:
                     temp = self.runtime / "media" / f"{media_id}.tmp"
-                    temp.write_bytes(packet.jpeg)
+                    temp.write_bytes(jpeg)
                     temp.replace(temp.with_suffix(".jpg"))
                 except OSError:
                     media_id = None
                     decision["evidence_error"] = "MEDIA_WRITE_FAILED"
             decision.update(
                 {
-                    "frame_id": packet.frame_id,
+                    "frame_id": packet.frame_id if packet else None,
                     "gallery_revision": self.gallery_revision,
-                    "model_set_id": "opencv-zoo-cpu-v1",
+                    "model_set_id": self.store.manifest["model_set_id"],
                     "calibration_id": self.calibration.get("calibration_id"),
                     "mode_revision": self.mode_revision,
                 }
@@ -810,21 +895,23 @@ class SecurityService:
                         db.execute(
                             "INSERT OR IGNORE INTO cloud_outbox(event_id) VALUES(?)", (event_id,)
                         )
-                    if decision["severity"] in {"warning", "alarm"}:
+                    prior = db.execute(
+                        "SELECT 1 FROM outbox o JOIN events e ON o.event_id=e.id WHERE e.visit_id=? LIMIT 1",
+                        (decision["visit_id"],),
+                    ).fetchone()
+                    if should_notify(decision, self.cfg["notifications"], bool(prior)):
                         db.execute(
-                            "INSERT OR IGNORE INTO outbox VALUES(?,?,'pending',0,?,NULL)",
+                            "INSERT OR IGNORE INTO outbox(id,event_id,state,attempts,created_at,reason) VALUES(?,?,'pending',0,?,NULL)",
                             (str(uuid4()), event_id, utcnow()),
                         )
+                        db.execute(
+                            "INSERT OR IGNORE INTO push_outbox(event_id,created_at) VALUES(?,?)",
+                            (event_id, utcnow()),
+                        )
+            if not cursor.rowcount and media_id:
+                (self.runtime / "media" / f"{media_id}.jpg").unlink(missing_ok=True)
             if staged_command:
                 self._deliver_committed(staged_command)
-        self.latest_analysis = {
-            "frame_id": packet.frame_id,
-            "source": self.source,
-            "observations": [o.model_dump() for o in observations],
-            "processed_at": utcnow(),
-        }
-        self.last_analysis_ms = now
-        self.worker_error = None
 
     def analysis_metrics(self, now):
         times = self.analysis_times

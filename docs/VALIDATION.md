@@ -1,5 +1,29 @@
 # Kiểm chứng, calibration và demo
 
+Review demo 02/11 đã được operator chấp nhận: clear test 1/1 đúng; mask test chưa
+xác nhận KNOWN, trả UNCERTAIN/không alarm được chấp nhận trong phạm vi demo; unknown
+PASS theo operator. Test còi 1000 ms có ACK và operator xác nhận tự tắt. Profile
+`doorstep-demo-v2-20261102-reviewed`, limit 1 người, đã áp dụng; không đồng nghĩa
+toàn bộ mục tiêu G4/full HIL đã đạt. Xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md).
+
+Cập nhật02/11: `early-evidence-v2` thêm xác nhận known-only bằng hai ảnh mạnh;
+xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md). Local 158 test PASS, Linux 157 PASS/
+1skip, HTTP smoke PASS; validation native clear/mask thu đủ đúng2/2, chưa là
+holdout. Mục người lạ PASS theo xác nhận của người dùng; không biến các clip
+known bị gắn nhãn nhầm thành số đo unknown. Cần freeze rồi đối chứng mới.
+
+Nâng cấp lượt ngắn xem [RECOGNITION_UPGRADE](RECOGNITION_UPGRADE.md). Giữ model
+baseline; bổ sung kiểm identity trước B, khe ROI, quay mặt khi vặn khóa, lượt
+ngắn không đủ mặt, reentry, người lạ, completion idle và STOP/disarm race.
+Thời điểm alarm/hiển thị sau khi rời ảnh phải đo riêng trên hardware; mục tiêu
+người dùng cho phép khoảng 3–4 giây, không là kết quả đã nghiệm thu. Replay
+scheduled không thay HIL hoặc holdout. Thay flow/ROI làm profile hash đổi.
+Kiểm tra software ngày 01/11/2026: `tools.check --http` đạt 138 test, lint,
+format và HTTP smoke. Linux biệt lập đạt 137 pass/1 skip (thiếu Node); 13 ca Node
+đạt local. Flow mới đã triển khai Oracle 22:27 ngày 01/11; gallery rỗng và
+`CAMERA_PROFILE_CHANGED` vẫn chặn giám sát. Chưa có holdout/người lạ độc lập
+hoặc HIL của flow mới; không tự cập nhật calibration để vượt gate.
+
 Các con số trong YAML là **seed**. Chỉ report từ camera/laptop/bố trí thực của nhóm mới cho biết phạm vi đã đạt. Simulator kiểm luồng; unit test kiểm quy tắc; ONNX smoke kiểm model load. Không phép nào thay độ chính xác, độ trễ đầu-cuối hoặc kiểm nguồn/còi thật.
 
 **Topology hiện tại đã chọn:** ESP32 → backend/AI trên Oracle; laptop chỉ mở
@@ -110,6 +134,17 @@ request sync nhỏ nhất: không gọi đây là phép đo exposure→paint ch�
 thử vật lý/clock được hiệu chỉnh khi nghiệm thu p95 đầu-cuối video dưới1giây.
 
 Thời gian recorder là thời điểm nhận ảnh ở client, xấp xỉ cadence quan sát. Không dùng nó như timestamp exposure hoặc độ trễ còi vật lý. Quan sát quá ít/ảnh mất cần ghi vào biên bản; không chỉ giữ các lượt đẹp. Tool không tự xác nhận consent hoặc nhãn đúng; người nhóm review chúng.
+
+Recorder CLI chờ luồng có bốn frame khác nhau trong hai giây trước khi đếm ngược
+và tính thời gian lượt; warmup/đếm ngược vẫn gia hạn viewer lease. Nếu khởi động
+quá 20 giây chưa có luồng ổn định thì chưa bắt đầu lượt. Mỗi clip đã bắt đầu có
+`capture-health.json`; clip thiếu số ảnh hoặc chỉ phủ dưới 80% thời gian tại
+client không được thêm manifest, ảnh lỗi vẫn giữ riêng để chẩn đoán.
+Ảnh và timestamp của lượt thu thiếu được giữ trong `visit.partial.json`, không
+được đưa vào manifest chính như một lượt thu đạt. Ghi cả số
+lượt thu thất bại vào báo cáo reliability; không bỏ chúng để nâng accuracy hoặc
+gọi những lượt còn lại là holdout thành công. Coverage của recorder không chứng
+minh đủ ảnh mặt rõ, đúng geometry hay đáp ứng độ trễ còi.
 
 `data/camera-v1/visits.jsonl`: mỗi dòng một object. Ví dụ schema (các path phải là ảnh JPEG thực, duy nhất; không copy ảnh để tăng N):
 
@@ -281,7 +316,7 @@ Tất cả là **chưa được đo** ở thời điểm bàn giao staging. Thu 
 1. Gắn camera tại vị trí demo; 3 điều kiện sáng đều/ngược sáng/thiếu sáng và 2 điều kiện đêm có/không illumination. Mỗi điều kiện có known, unknown, face obscured, empty và người đi ngang. Ghi tỷ lệ false `UNKNOWN` và chưa xác định, frame quality score, RTT, FPS.
 2. Đèn cần thời gian ổn định trước chụp; thử cấp nguồn/chạm tải bật đèn, brownout, nhiệt, bảo vệ nước và ánh sáng phản xạ chói camera.
 3. Remote test 4G phone + Tailscale, trang PWA HTTPS, stream ảnh 30 giây rồi reconnect, 3 client, logout; ảnh phải dừng nếu thiết bị disarmed và frame cũ.
-4. Telegram: có ảnh và sự kiện đúng, link mở private dashboard, không chứa bearer/session secret, không gửi video; đo retry khi Telegram timeout.
+4. Telegram: có ảnh và sự kiện đúng, link mở private dashboard, không chứa bearer/session secret, không gửi video; đo retry khi Telegram timeout. Đối chiếu `sent` (provider chấp nhận) với tin thực trên điện thoại khi web đóng, thử nút Gửi thử và lượt known/chưa xác định ngắn; hướng dẫn và các giới hạn trong [NOTIFICATIONS](NOTIFICATIONS.md).
 5. Level 3 cloud: capture trên ESP32, gateway upload JPEG qua HTTPS, process trên server cloud khác máy, đối chiếu observation frame/event ids, DB cloud metadata và app phân tích số lượng theo reason/severity/day. Cần báo cáo số frame stale khi mạng xấu, tỷ lệ quyết định bị fail-closed; **không được tắt freshness để đủ demo**.
 6. Vận hành mất Internet/mất cloud, mất nguồn camera, server restart, revoke credential, cloud token sai; còi phải OFF khi control lost; cloud failure không biến `UNCERTAIN` thành `UNKNOWN`.
 

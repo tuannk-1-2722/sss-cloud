@@ -1,5 +1,15 @@
 # Contracts v2 — firmware, backend, AI và dashboard
 
+Notification extension 02/11: authenticated status thêm `notifications` gồm
+enabled/ready/reason, quyền ảnh, loại sự kiện, counts/latest; không lộ token/chat.
+POST `/api/v2/notifications/test` admin+CSRF, body `{idempotency_key, include_photo:false}`,
+202 trả `{event_id,state:"pending"}`. Cùng key/cùng body idempotent; đổi body409,
+key mới trong30giây429. Ảnh thử cần consent và frame mới; không tạo command hoặc
+AI observation, event mang `source=system_test`, reason `notification_test`.
+History `notification` thêm next_attempt_at/delivered_at/media_kind/duplicate_possible.
+`sent` là provider accepted, không là điện thoại đã đọc. Device contract không đổi.
+Xem [NOTIFICATIONS](NOTIFICATIONS.md).
+
 Base `/api/v2`. Wire identifiers tiếng Anh; JSON UTF-8, extra fields bị từ chối ở request Pydantic. UUID/session là opaque. Một board `device_id` slug theo config. Thời gian server UTC cho history; timeout dùng monotonic/uptime, không trừ UTC cho millis.
 
 **Cập nhật 31/10/2026:** video liên tục dùng giao thức ở mục 7 bên dưới. Hello/
@@ -147,6 +157,12 @@ Hardware profile luôn từ chối synthetic observations. Dashboard giữ nhãn
 | `GET /commands` | 50 records gần nhất; state/ACK riêng |
 | `GET /latest-frame` | JPEG, X-Frame-Id, no-store; 404 chưa có |
 | `GET /media/{id}` | authenticated JPEG evidence, 404 thiếu/purged |
+| `GET /push/config` | `{enabled,configured,public_key,max_subscriptions}`; `public_key` null nếu tắt hoặc thiếu VAPID/subject/HTTPS URL |
+| `POST /push/subscribe` | `{endpoint,keys:{p256dh,auth}}` → 201; 409 `PUSH_DISABLED`/`PUSH_SUBSCRIPTION_LIMIT` (tối đa 10), 422 nếu endpoint không thuộc FCM/Mozilla/Apple/Windows push hoặc khóa sai độ dài |
+| `POST /push/unsubscribe` | `{endpoint}` → 204, idempotent |
+| `GET /push-media/{id}?exp&sig` (ngoài `/api/v2`, **không cookie**) | JPEG cho ảnh thông báo; HMAC-SHA256 + hết hạn ≤ 1 giờ; mọi lỗi đều 404 `MEDIA_NOT_FOUND`; 404 khi `push_enabled=false` |
+
+Web Push payload (mã hoá RFC 8291, < 1 KB): `{title,body,event_id,url,image?}`. Không nhúng JPEG; `image` là URL ký ở trên cùng origin dashboard. `push_outbox` ghi trong cùng transaction với `outbox`, worker riêng `push-worker`; 404/410 từ push service xoá subscription.
 
 Action key test/silence lưu DB 24h, cùng key khác fingerprint conflict; command + key persist atomically. Duplicate action trả kết quả cũ, không tạo lệnh mới. Thao tác khác dùng revision/resource state hoặc bản chất idempotent. Preview/enrollment đang active thì retry không tạo phiên thứ hai.
 
@@ -270,3 +286,33 @@ Các API dưới đây **không thay đổi** ESP32 device hello/sync/frames con
 - **Migrations**: `002_cloud_outbox.sql` thêm bảng outbox riêng, không sửa `001_initial.sql`. Thay đổi thêm cloud mode không làm đảo thứ tự command/ACK hoặc bỏ freshness/revision gates.
 
 Các lỗi xác thực/validation không được echo `jpeg`, gallery, token. Không mở cloud service qua plain HTTP.
+
+## Chẩn đoán nhận diện — 01/11/2026
+
+- `Observation` có thêm `evidence` tùy chọn: min_side_px, eye_distance_px,
+  blur/eye_blur, clipped, face_confidence, s1/s2; chỉ số hữu hạn, không vector.
+  `tracking_reason` tùy chọn mô tả association. Producer/consumer Observation
+  (gồm cloud service/adapter nếu dùng topology tách AI) phải nâng cùng phiên bản;
+  firmware gửi JPEG không cần tạo các field này. Synthetic endpoint chỉ được dùng
+  trong simulation như trước, không cho đưa evidence giả vào hardware.
+  `identity_eligible` là boolean strict, mặc định false cho producer cũ; true cho
+  phép tích evidence trong ROI dù anchor ở khe trung tính. Nó không cấp geometry
+  hay incoming/alarm. Numeric NumPy từ detector được đổi thành Python bool trước
+  khi tạo Observation; không nới strict validation của HTTP.
+- GET `/api/v2/diagnostics/recognition?after=0`: admin session, no-store,
+  ring metadata hữu hạn, sequence/counts và trạng thái trace. Không trả ảnh/vector
+  hay danh tính thật. `after` chỉ lọc RAM, không đọc lịch sử DB.
+- POST `/api/v2/diagnostics/recognition/start`: admin + CSRF, bắt đầu cửa sổ
+  `diagnostics.trace_duration_ms`, clear ring/counts và đổi alias key; sequence
+  tiếp tục tăng. Không thay mode/session/gallery hoặc quyền điều khiển còi.
+- DELETE `/api/v2/diagnostics/recognition`: admin + CSRF, dừng journal trace,
+  HTTP204. Ring vẫn hữu hạn; restart xóa toàn bộ RAM trace.
+- Mặc định không ghi journal từng frame; chỉ log trong cửa sổ operator bật.
+  Cấu hình history_limit tối đa1024, trace_duration_ms tối đa300000; mặc định
+  trong YAML, không thuộc camera calibration hash vì không đổi quyết định AI.
+- Status thêm `recent_visits` hữu hạn: visit_completed gồm identity/person_id,
+  direction, completion_reason, last_observed_ms/completed_ms, không phải còi mới.
+  Lịch sử DB có event info `visit_completed`; completion không lưu thêm ảnh.
+- GET latest-frame thêm X-Observed-Ms và X-Received-Ms (clock monotonic server,
+  observed là ước lượng nguồn từ sync), để recorder giữ riêng capture/arrival.
+  Recorder cũ vẫn dùng được X-Frame-Id; timing client_poll phải ghi đúng giới hạn.

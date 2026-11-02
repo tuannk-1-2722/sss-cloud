@@ -38,6 +38,7 @@ class EnrollmentManager:
             s.mode_revision += 1
             s.mode = "ENROLLMENT" if purpose == "enrollment" else "DISARMED"
             s.policy.reset()
+            s.visit_evidence.clear()
             s.capture_session = {
                 "id": str(uuid4()),
                 "purpose": purpose,
@@ -107,6 +108,13 @@ class EnrollmentManager:
             with s.store.connection() as db:
                 db.execute("UPDATE people SET active=0 WHERE id=?", (person_id,))
                 if delete:
+                    # Already in-flight delivery may have left the server; report it as uncertain.
+                    db.execute(
+                        "UPDATE outbox SET state='cancelled',reason='PERSON_DELETED' WHERE state='pending'"
+                    )
+                    db.execute(
+                        "UPDATE outbox SET state='unknown',reason='PERSON_DELETED_DURING_DELIVERY' WHERE state='sending'"
+                    )
                     db.execute("DELETE FROM people WHERE id=?", (person_id,))
                     # Evidence can contain multiple people: purge all images on full deletion.
                     for row in db.execute("SELECT id,details_json FROM events").fetchall():
@@ -123,6 +131,7 @@ class EnrollmentManager:
                     s.video.reset()
             s.gallery_revision += 1
             s.policy.reset()
+            s.visit_evidence.clear()
             s._issue("STOP_ALARM")
             s.store.audit("person_deleted" if delete else "person_disabled", person_id)
             if not any(p["active"] for p in s.store.people()):
@@ -284,4 +293,5 @@ class EnrollmentManager:
                 db.execute("UPDATE people SET active=1 WHERE id=?", (person_id,))
             s.gallery_revision += 1
             s.policy.reset()
+            s.visit_evidence.clear()
             s.store.audit("person_activated", person_id)

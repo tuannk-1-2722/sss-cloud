@@ -276,3 +276,32 @@ test('decode work is bounded to one running and one newest candidate, with gener
   r.run('renderer.clear()'); r.context.releases.shift()(); await flush();
   assert.deepEqual(Array.from(r.context.painted), ['A']);
 });
+
+test('hardware setup guidance distinguishes an empty gallery from a changed calibration', async () => {
+  const r = realm(true); r.run('csrf = "fixture"'); await r.run('refresh()');
+  assert.match(r.element('profile-banner').textContent, /Chưa có người quen/);
+  r.status().calibration_error = 'CAMERA_PROFILE_CHANGED';
+  await r.run('refresh()');
+  assert.match(r.element('profile-banner').textContent, /duyệt lại hồ sơ/);
+  assert.equal(r.requests.filter(x => x.url.endsWith('/system/mode')).length, 0);
+  r.run('cachedPeople = [{id: "private"}]; lastCompletedVisit = "old"; logoutView()');
+  assert.equal(r.run('cachedPeople.length'), 0);
+  assert.equal(r.run('lastCompletedVisit'), null);
+});
+
+test('Telegram test is an explicit action, follows photo permission, and never arms the camera', async () => {
+  const r = realm(true); r.run('csrf = "fixture"');
+  r.context.crypto = {getRandomValues: values => values.fill(1)};
+  r.status().notifications = {ready: false, reason: 'PROVIDER_NOT_CONFIGURED', photos_enabled: false};
+  await r.run('refresh()');
+  assert.equal(r.element('telegram-test').disabled, true);
+  assert.match(r.element('telegram-state').textContent, /Chưa cấu hình/);
+  r.status().notifications = {ready: true, photos_enabled: true, known_visits_enabled: true, unresolved_visits_enabled: true};
+  await r.run('refresh()');
+  r.element('telegram-test-photo').checked = true;
+  await r.element('telegram-test').onclick({target:r.element('telegram-test')});
+  const sent = r.requests.filter(x => x.url.endsWith('/notifications/test'));
+  assert.equal(sent.length, 1);
+  assert.equal(JSON.parse(sent[0].body).include_photo, true);
+  assert.equal(r.requests.filter(x => x.url.endsWith('/system/mode')).length, 0);
+});

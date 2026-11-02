@@ -34,6 +34,7 @@ def main():
             "models-smoke",
             "doctor",
             "calibration-check",
+            "push-keys",
             "backup",
             "restore",
         ],
@@ -63,6 +64,12 @@ def main():
                 indent=2,
             )
         )
+        return
+    if args.command == "push-keys":
+        from security_app.push import generate_vapid
+
+        # Prints only the public key; the private PEM stays in the runtime directory.
+        print(json.dumps({"vapid_public_key": generate_vapid(runtime)}))
         return
     if args.command == "calibration-check":
         profile, error = calibration_status(cfg)

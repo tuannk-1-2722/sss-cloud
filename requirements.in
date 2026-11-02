@@ -9,3 +9,4 @@ PyYAML==6.0.3
 filelock==4.0.8
 argon2-cffi==25.1.0
 httpx==0.28.1
+pywebpush==1.14.1

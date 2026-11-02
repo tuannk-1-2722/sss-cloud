@@ -17,6 +17,7 @@ let lastRtt = null;
 let activeTab = "monitor", cameraStatusValid = false, cameraTarget = null;
 let displayedFrame = null, displayedMeta = null;
 let nextListsRefresh = 0, cachedPeople = [], lastStatusRefresh = -Infinity;
+let lastCompletedVisit = null;
 
 const labels = {
   KNOWN: "Người quen",
@@ -31,6 +32,8 @@ const labels = {
   OUTGOING: "Từ cửa ra ngoài",
   UNRESOLVED: "Chưa rõ chiều đi",
   known_visit: "Người quen ở vùng cửa",
+  visit_completed: "Kết quả lượt vừa kết thúc",
+  notification_test: "Thử thông báo Telegram",
   unknown_approach: "Người chưa đăng ký tiếp cận cửa",
   unresolved_presence: "Cần kiểm tra người ở vùng cửa",
   capacity_exceeded: "Vượt phạm vi hai người",
@@ -41,10 +44,43 @@ const labels = {
   cancelled: "Đã hủy",
   rejected: "Thiết bị từ chối",
   disabled: "Đã tắt",
-  sent: "Đã gửi",
+  sent: "Telegram đã nhận",
+  sending: "Đang gửi",
   failed: "Gửi thất bại",
   unknown: "Chưa xác nhận gửi thành công"
 };
+
+const setupMessages = {
+  DISABLED: "Telegram đang tắt.",
+  PROVIDER_NOT_CONFIGURED: "Chưa cấu hình bot Telegram và người nhận trên server.",
+  BOT_TOKEN_INVALID: "Token bot chưa đúng định dạng; cần kiểm tra cấu hình server.",
+  CHAT_ID_INVALID: "Người nhận Telegram chưa được cấu hình đúng.",
+  BOT_TOKEN_REJECTED: "Telegram từ chối token bot; cần cấu hình lại.",
+  BOT_BLOCKED_OR_FORBIDDEN: "Bot bị chặn hoặc chưa được phép gửi tới người nhận.",
+  PHOTO_CONSENT_REQUIRED: "Chưa bật quyền gửi ảnh camera qua Telegram.",
+  NOTIFICATION_TEST_RATE_LIMIT: "Vui lòng chờ 30 giây trước khi gửi thử tiếp.",
+  DELIVERY_UNCONFIRMED: "Chưa xác nhận lần gửi; gửi lại có thể trùng thông báo.",
+  PROCESS_INTERRUPTED: "Server dừng trong khi gửi; chưa xác định Telegram đã nhận hay chưa.",
+  DELIVERY_STATE_LOST: "Chưa xác định kết quả gửi sau lỗi lưu trạng thái.",
+  RATE_LIMIT: "Telegram giới hạn tốc độ; hệ thống đang chờ đến lượt gửi lại.",
+  PROVIDER_ERROR: "Telegram tạm lỗi; hệ thống sẽ gửi lại trong thời hạn.",
+  PROVIDER_REJECTED: "Telegram từ chối yêu cầu; kiểm tra bot và người nhận.",
+  PROVIDER_RESPONSE_INVALID: "Phản hồi Telegram không đủ để xác nhận gửi thành công.",
+  PHOTO_REJECTED_TEXT_SENT: "Ảnh bị từ chối; nội dung thông báo đã được gửi.",
+  ALERT_TOO_OLD: "Thông báo quá hạn, không gửi lại cảnh báo cũ.",
+  PERSON_DELETED: "Đã hủy thông báo chưa gửi sau khi xóa hồ sơ.",
+  PERSON_DELETED_DURING_DELIVERY: "Hồ sơ bị xóa khi đang gửi; cần kiểm tra kết quả trên Telegram.",
+  FRAME_NOT_AVAILABLE: "Chưa có ảnh camera mới; mở video rồi thử lại.",
+  CAMERA_PROFILE_CHANGED: "Luồng xử lý hoặc bố trí camera đã thay đổi. Cần kiểm chứng và duyệt lại hồ sơ hiệu chỉnh trước khi bật giám sát. Video và đăng ký mẫu vẫn dùng được.",
+  CALIBRATION_REQUIRED: "Chưa có hồ sơ hiệu chỉnh được duyệt. Hãy hoàn tất đăng ký mẫu và kiểm chứng camera trước khi bật giám sát.",
+  EMPTY_GALLERY: "Chưa có người quen đang được dùng để nhận diện. Vào Người quen để đăng ký, lưu mẫu và kích hoạt hồ sơ sau khi kiểm chứng.",
+  GALLERY_SAMPLES_REQUIRED: "Hồ sơ chưa đủ mẫu hợp lệ. Hãy hoàn tất hai lượt đăng ký và lưu mẫu.",
+  GALLERY_REENROLL_REQUIRED: "Mẫu đã lưu không tương thích với model hiện tại. Cần đăng ký lại trước khi giám sát."
+};
+
+function setupMessage(code) {
+  return setupMessages[code] || code;
+}
 
 const enrollmentFeedback = {
   "Face the camera; follow the enrollment guide": "Đưa mặt vào khung bầu dục, nhìn vào camera để bắt đầu thu mẫu.",
@@ -178,7 +214,7 @@ async function api(path, method = "GET", body) {
     throw new Error("Cần đăng nhập lại.");
   }
   const result = response.status === 204 ? {} : await response.json();
-  if (!response.ok) throw new Error(result.error?.code || "Yêu cầu thất bại");
+  if (!response.ok) throw new Error(setupMessage(result.error?.code) || "Yêu cầu thất bại");
   return result;
 }
 
@@ -294,6 +330,9 @@ function logoutView() {
   invalidateCamera();
   current = null;
   events = [];
+  cachedPeople = [];
+  nextListsRefresh = 0;
+  lastCompletedVisit = null;
   peopleById.clear();
   clearImages();
   for (const id of ["event-list", "people-list", "tracks"]) $(id).replaceChildren();
@@ -302,7 +341,70 @@ function logoutView() {
   $("app").hidden = true;
   $("login-panel").hidden = false;
   $("logout").hidden = true;
+  pushReady = false;
+  $("push-toggle").hidden = true;
   $("connection").textContent = "Chưa đăng nhập";
+}
+
+/* Web Push: subscription lives in the browser; the server stores only the endpoint and keys. */
+let pushReady = false;
+let pushSubscription = null;
+
+function pushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+
+function urlBase64ToBytes(value) {
+  const raw = atob(value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "="));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+
+function renderPushToggle() {
+  const button = $("push-toggle");
+  button.hidden = false;
+  button.textContent = pushSubscription ? "Tắt thông báo" : "Bật thông báo";
+}
+
+async function setupPush() {
+  const button = $("push-toggle");
+  button.hidden = true;
+  if (!pushSupported()) return;
+  try {
+    const config = await api("/push/config");
+    if (!config.enabled || !config.configured || !config.public_key) return;
+    const registration = await navigator.serviceWorker.ready;
+    pushSubscription = await registration.pushManager.getSubscription();
+    button.onclick = () => action(button, () => togglePush(registration, config.public_key));
+    renderPushToggle();
+  } catch (e) {
+    button.hidden = true;
+  }
+}
+
+async function togglePush(registration, publicKey) {
+  if (pushSubscription) {
+    const endpoint = pushSubscription.endpoint;
+    await pushSubscription.unsubscribe();
+    pushSubscription = null;
+    await api("/push/unsubscribe", "POST", { endpoint });
+    show("Đã tắt thông báo trên thiết bị này.");
+  } else {
+    if (await Notification.requestPermission() !== "granted") throw new Error("Chưa được cấp quyền thông báo.");
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToBytes(publicKey)
+    });
+    try {
+      const { endpoint, keys } = subscription.toJSON();
+      await api("/push/subscribe", "POST", { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } });
+    } catch (e) {
+      await subscription.unsubscribe();
+      throw e;
+    }
+    pushSubscription = subscription;
+    show("Đã bật thông báo trên thiết bị này.");
+  }
+  renderPushToggle();
 }
 
 async function action(button, fn) {
@@ -359,6 +461,19 @@ for (const [id, mode] of [
     expected_revision: current.mode_revision
   });
   show(labels[mode]);
+});
+
+$("recognition-trace").onclick = e => action(e.target, async () => {
+  await api("/diagnostics/recognition/start", "POST", {});
+  show("Đang ghi số đo trong 2 phút. Bạn có thể thực hiện các lượt thử.");
+});
+
+$("telegram-test").onclick = e => action(e.target, async () => {
+  await api("/notifications/test", "POST", {
+    idempotency_key: actionKey(), include_photo: $("telegram-test-photo").checked
+  });
+  nextListsRefresh = 0;
+  show("Đã xếp hàng thông báo thử. Kiểm tra Telegram trên điện thoại và trạng thái trong lịch sử.");
 });
 
 $("test").onclick = e => action(e.target, async () => {
@@ -420,8 +535,9 @@ async function refresh() {
     $("app").hidden = false;
     $("login-panel").hidden = true;
     $("logout").hidden = false;
+    if (!pushReady) { pushReady = true; setupPush(); }
     $("connection").textContent = current.device_online ? "Thiết bị online" : "Thiết bị offline";
-    $("profile-banner").textContent = current.profile === "simulation" ? "ĐANG GIẢ LẬP — quan sát và còi không phải kết quả phần cứng hoặc độ chính xác AI." : "CAMERA THẬT — " + (current.calibration_error ? "Cần hoàn tất hiệu chỉnh: " + current.calibration_error : "Hồ sơ hiệu chỉnh: " + current.calibration_id);
+    $("profile-banner").textContent = current.profile === "simulation" ? "ĐANG GIẢ LẬP — quan sát và còi không phải kết quả phần cứng hoặc độ chính xác AI." : "CAMERA THẬT — " + (current.calibration_error ? setupMessage(current.calibration_error) : current.active_people === 0 ? setupMessage("EMPTY_GALLERY") : "Hồ sơ hiệu chỉnh: " + current.calibration_id);
     $("mode-info").textContent = labels[current.mode] + (current.worker_error ? " · " + current.worker_error : "");
     const health = $("health");
     health.replaceChildren();
@@ -430,7 +546,21 @@ async function refresh() {
     if (current.environment_quality) statusRow(health, "Chất lượng môi trường", current.environment_quality.usable
       ? `Đủ sáng theo ngưỡng ban đầu (luma ${current.environment_quality.median_luma})`
       : `Ảnh suy giảm: ${current.environment_quality.reason} — KHÔNG kết luận danh tính`);
-    if (current.notification_error) statusRow(health, "Thông báo", current.notification_error);
+    if (current.notification_error) statusRow(health, "Thông báo", setupMessage(current.notification_error));
+    const notifications = current.notifications;
+    if (notifications) {
+      $("telegram-state").textContent = notifications.ready
+        ? `Đã cấu hình Telegram · ${notifications.photos_enabled ? "có ảnh" : "chỉ nội dung"} · người quen: ${notifications.known_visits_enabled ? "bật" : "tắt"} · lượt chưa xác định: ${notifications.unresolved_visits_enabled ? "bật" : "tắt"}`
+        : setupMessage(notifications.reason);
+      if (notifications.photo_consent_required) $("telegram-state").textContent += " · cần xác nhận quyền gửi ảnh trên server";
+      $("telegram-test").disabled = !notifications.ready;
+      $("telegram-test-photo").disabled = !notifications.photos_enabled;
+      if (!notifications.photos_enabled) $("telegram-test-photo").checked = false;
+      const latest = notifications.latest;
+      $("telegram-delivery").textContent = latest
+        ? `Lần gần nhất: ${labels[latest.state] || latest.state}${latest.reason ? " · " + setupMessage(latest.reason) : ""}${latest.duplicate_possible ? " · có khả năng trùng do lần gửi trước chưa rõ" : ""}`
+        : "Chưa có lượt gửi. Bấm Gửi thử Telegram khi sẵn sàng.";
+    }
     statusRow(health, "Lệnh đang chờ", current.pending_command?.type || "Không có");
     statusRow(health, "Người quen active", current.active_people);
     statusRow(health, "Ảnh bỏ do thay mới", current.frames_replaced);
@@ -438,6 +568,12 @@ async function refresh() {
     statusRow(health, "FPS nhận từ camera", current.video.received_fps.toFixed(1));
     statusRow(health, "Nhịp AI", current.mode === "DISARMED" ? "Đã dừng" : `${current.analysis.interval_ms} ms · thực tế ${current.analysis.effective_fps.toFixed(1)} FPS`);
     statusRow(health, "Thời gian AI p95", current.analysis.duration_p95_ms === null ? "Chưa đo" : `${current.analysis.duration_p95_ms} ms${current.analysis.over_budget ? " · vượt ngân sách xử lý" : ""}`);
+    const completed = current.recent_visits || [];
+    const latestCompleted = completed.length ? completed[completed.length - 1].visit_id : null;
+    if (latestCompleted !== lastCompletedVisit) {
+      lastCompletedVisit = latestCompleted;
+      nextListsRefresh = 0;
+    }
     if (performance.now() >= nextListsRefresh) {
       const [people, receivedEvents] = await Promise.all([api("/people"), api("/events?limit=100")]);
       if (epoch !== viewEpoch) return;
@@ -462,6 +598,11 @@ async function refresh() {
         }));
         row.append(b);
       }
+      tracks.append(row);
+    }
+    for (const visit of completed.slice(-3).reverse()) {
+      const row = node("div", undefined, "track");
+      row.append(node("strong", `Lượt đã kết thúc: ${labels[visit.identity] || labels.UNCERTAIN}${visit.person_id ? ` · ${peopleById.get(visit.person_id) || "Hồ sơ"}` : ""}`));
       tracks.append(row);
     }
     renderEnrollment();
@@ -496,7 +637,7 @@ function renderPeople(people) {
     }
     const del = node("button", "Xóa hoàn toàn");
     del.onclick = () => {
-      if (confirm("Xóa mẫu khuôn mặt và toàn bộ ảnh bằng chứng hiện có. Nhóm cần xóa các backup cũ riêng nếu đã tạo. Tiếp tục?")) cameraAction(del, () => api(`/people/${person.id}`, "DELETE"));
+      if (confirm("Xóa mẫu khuôn mặt và ảnh bằng chứng trên server. Bản đã gửi Telegram và các backup cũ cần xóa riêng. Tiếp tục?")) cameraAction(del, () => api(`/people/${person.id}`, "DELETE"));
     };
     buttons.append(del);
     row.append(info, buttons);
@@ -510,8 +651,9 @@ function renderEvents() {
   for (const event of events.filter(e => $("severity-filter").value === "all" || e.severity === $("severity-filter").value)) {
     const row = node("article", undefined, "card event " + event.severity);
     row.append(node("h3", labels[event.reason] || event.reason), node("p", new Date(event.created_at).toLocaleString("vi-VN") + " · " + event.source));
-    row.append(node("p", `Còi: ${event.details.audible?(labels[event.command?.state]||"Chờ thiết bị"):(event.details.suppression||"Không phát lệnh")}. Thông báo: ${labels[event.notification?.state]||"Trong dashboard"}.`));
+    row.append(node("p", `Còi: ${event.details.audible?(labels[event.command?.state]||"Chờ thiết bị"):(event.details.suppression||"Không phát lệnh")}. Thông báo: ${labels[event.notification?.state]||"Trong dashboard"}${event.notification?.reason ? " · " + setupMessage(event.notification.reason) : ""}.`));
     if (event.details.person_id) row.append(node("p", `Người: ${peopleById.get(event.details.person_id) || "Hồ sơ không còn active"}`));
+    if (event.reason === "visit_completed") row.append(node("p", `Kết quả: ${labels[event.details.identity] || labels.UNCERTAIN}`));
     const actions = node("div", undefined, "actions");
     const ack = node("button", event.acknowledged_at ? "Đã xem" : "Đánh dấu đã xem");
     ack.disabled = !!event.acknowledged_at;

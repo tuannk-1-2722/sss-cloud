@@ -17,11 +17,14 @@ class ConservativeTracker:
     def __init__(self, config: dict):
         self.cfg = config
         self.targets: dict[str, tuple] = {}
+        self.last_reasons: dict[str, str] = {}
 
     def reset(self):
         self.targets.clear()
+        self.last_reasons.clear()
 
     def assign(self, boxes: list[tuple], now: int, kinds: list[bool] | None = None) -> list[str]:
+        self.last_reasons = {}
         kinds = kinds or [True] * len(boxes)
         self.targets = {
             k: v
@@ -68,6 +71,9 @@ class ConservativeTracker:
         ids = []
         for i, box in enumerate(boxes):
             key = result.get(i, str(uuid4()))
+            self.last_reasons[key] = (
+                "MATCHED" if i in result else "AMBIGUOUS" if i in ambiguous_i else "NEW_TRACK"
+            )
             self.targets[key] = (box, now, kinds[i])
             ids.append(key)
         return ids
