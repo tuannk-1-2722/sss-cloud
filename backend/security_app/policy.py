@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from uuid import uuid4
 
 from .contracts import Observation
+from .recognition_reasons import identity_reason
 from .spatial import zone_for
 
 
@@ -36,6 +37,9 @@ class Track:
     result_person_id: str | None = None
     identity_conflict: bool = False
     last_reason: str | None = None
+    identity_reason: str | None = "INSUFFICIENT_IDENTITY_EVIDENCE"
+    observation_counts: Counter = field(default_factory=Counter)
+    reason_counts: Counter = field(default_factory=Counter)
 
 
 class PolicyEngine:
@@ -72,6 +76,18 @@ class PolicyEngine:
         track.strong_confirmed = False
         track.confirmed, track.person_id = "UNCERTAIN", None
         track.last_eligible = track.last_vote = -100000
+        track.identity_reason = "INSUFFICIENT_IDENTITY_EVIDENCE"
+        track.observation_counts.clear()
+        track.reason_counts.clear()
+
+    @staticmethod
+    def _evidence_summary(track):
+        return {
+            "observation_counts": dict(track.observation_counts),
+            "reason_counts": dict(track.reason_counts),
+            "known_votes": sum(v[1] == "KNOWN" for v in track.votes),
+            "unknown_votes": sum(v[1] == "UNKNOWN" for v in track.votes),
+        }
 
     def _complete(self, key, track, now, reason):
         if track.visit_id is None or track.completed:
@@ -95,10 +111,12 @@ class PolicyEngine:
             "identity_reason": (
                 "IDENTITY_CONFLICT"
                 if track.identity_conflict
-                else track.last_reason or "INSUFFICIENT_IDENTITY_EVIDENCE"
+                else track.identity_reason or "INSUFFICIENT_IDENTITY_EVIDENCE"
             )
             if identity == "UNCERTAIN"
             else None,
+            "identity_evidence": self._evidence_summary(track),
+            "geometry_valid": track.geometry_valid,
         }
         track.completed = True
         self._recent_visits.append(result)
@@ -151,8 +169,8 @@ class PolicyEngine:
                 Track(last_seen=now, geometry_valid=observation.geometry_valid),
             )
             track.last_seen = now
-            track.last_reason = observation.reason or (
-                "NO_FACE" if observation.decision == "NO_FACE" else None
+            track.last_reason = identity_reason(observation.reason) or (
+                observation.decision if observation.decision in {"NO_FACE", "NOT_CHECKED"} else None
             )
             raw = zone_for(observation.bbox, self.config["zones"])
             track.raw_zone = raw
@@ -280,6 +298,9 @@ class PolicyEngine:
             track.strong_votes.popleft()
         if now > track.last_vote:
             kind, pid = observation.decision, observation.person_id
+            track.observation_counts[kind] += 1
+            if track.last_reason:
+                track.reason_counts[track.last_reason] += 1
             if kind == "KNOWN" and pid is None:
                 kind = "UNCERTAIN"
             if kind == "KNOWN" and (
@@ -335,12 +356,18 @@ class PolicyEngine:
             track.last_eligible = track.strong_votes[-1][0]
         elif (
             not known_ids
-            and unknown_count >= p["confirm_votes"]
-            and unknown_span >= p["confirmation_span_ms"]
+            and unknown_count >= p["unknown_confirm_votes"]
+            and unknown_span >= p["unknown_confirmation_span_ms"]
         ):
             track.confirmed, track.person_id = "UNKNOWN", None
             track.strong_confirmed = False
             track.last_eligible = max(v[0] for v in track.votes if v[1] == "UNKNOWN")
+        elif track.confirmed == "UNKNOWN" and known_ids:
+            # New known evidence must cancel UNKNOWN before it can authorize an alarm.
+            track.confirmed, track.person_id = "UNCERTAIN", None
+            track.last_eligible = -100000
+            if track.visit_id is not None and not track.completed:
+                track.identity_conflict = True
         elif track.strong_confirmed and unknown_count:
             # Contradictory evidence cancels the shorter known-only confirmation.
             track.confirmed, track.person_id = "UNCERTAIN", None
@@ -350,6 +377,18 @@ class PolicyEngine:
                 track.identity_conflict = True
         if now - track.last_eligible > p["identity_fresh_ms"]:
             track.confirmed, track.person_id = "UNCERTAIN", None
+        if track.identity_conflict:
+            track.identity_reason = "IDENTITY_CONFLICT"
+        elif track.confirmed != "UNCERTAIN":
+            track.identity_reason = None
+        elif known_ids and unknown_count:
+            track.identity_reason = "IDENTITY_EVIDENCE_CONFLICT"
+        elif track.last_eligible != -100000 and now - track.last_eligible > p["identity_fresh_ms"]:
+            track.identity_reason = "IDENTITY_EVIDENCE_EXPIRED"
+        elif known_count or unknown_count:
+            track.identity_reason = "INSUFFICIENT_IDENTITY_EVIDENCE"
+        else:
+            track.identity_reason = track.last_reason or "INSUFFICIENT_IDENTITY_EVIDENCE"
 
     def snapshot(self) -> list[dict]:
         return [
@@ -361,6 +400,9 @@ class PolicyEngine:
                 "visit_id": t.visit_id,
                 "identity": t.confirmed,
                 "person_id": t.person_id,
+                "geometry_valid": t.geometry_valid,
+                "identity_reason": t.identity_reason,
+                "identity_evidence": self._evidence_summary(t),
                 "silenced": t.silenced,
                 "votes": len(t.votes),
                 "known_votes": sum(v[1] == "KNOWN" for v in t.votes),

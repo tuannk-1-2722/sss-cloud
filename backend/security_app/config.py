@@ -134,6 +134,7 @@ def validate_config(c: dict) -> None:
         raise ValueError("reject < accept and both in [-1, 1] required")
     for key in (
         "face_confidence",
+        "monitoring_face_confidence",
         "face_nms",
         "person_confidence",
         "person_nms",
@@ -146,10 +147,19 @@ def validate_config(c: dict) -> None:
             raise ValueError(f"vision.{key}: must be in (0, 1]")
     if not 0 <= v["margin"] <= 2 or v["enrollment_face_min_px"] < v["face_min_px"]:
         raise ValueError("Invalid margin or enrollment face size")
+    if (
+        v["monitoring_face_confidence"] > v["face_confidence"]
+        or v["monitoring_blur_min"] > v["blur_min"]
+    ):
+        raise ValueError("Monitoring quality thresholds cannot exceed enrollment thresholds")
     if not 1 <= p["confirm_votes"] <= 128:
         raise ValueError("Invalid evidence count")
     if p["confirmation_span_ms"] > p["vote_window_ms"]:
         raise ValueError("Confirmation duration cannot fit inside evidence window")
+    if not 2 <= p["unknown_confirm_votes"] <= 128:
+        raise ValueError("UNKNOWN needs at least two distinct images")
+    if not 400 <= p["unknown_confirmation_span_ms"] <= p["vote_window_ms"]:
+        raise ValueError("UNKNOWN duration must be at least 400ms and fit evidence window")
     if not v["accept"] < p["strong_known_min_score"] <= 1:
         raise ValueError("Strong known score must be stricter than normal acceptance")
     if not v["margin"] <= p["strong_known_min_margin"] <= 2:

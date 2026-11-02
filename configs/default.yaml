@@ -35,6 +35,9 @@ policy:
   completed_history_limit: 20
   confirm_votes: 3
   confirmation_span_ms: 600
+  # Approved UNKNOWN-only rule; normal/strong KNOWN confirmation is unchanged.
+  unknown_confirm_votes: 2
+  unknown_confirmation_span_ms: 400
   # Optional known-only path. Both images must already pass all vision quality gates.
   strong_known_enabled: true
   strong_known_min_score: 0.60
@@ -90,12 +93,14 @@ vision:
   recognition_region: [0.05, 0.05, 0.90, 0.90]
   opencv_threads: 2
   face_confidence: 0.90
+  monitoring_face_confidence: 0.80
   face_nms: 0.30
   person_confidence: 0.50
   person_nms: 0.60
   face_min_px: 80
   enrollment_face_min_px: 100
   blur_min: 60
+  monitoring_blur_min: 6
   clipped_fraction_max: 0.40
   accept: 0.45
   reject: 0.30

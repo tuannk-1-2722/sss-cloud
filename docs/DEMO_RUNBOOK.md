@@ -1,5 +1,12 @@
 # Chuẩn bị và chạy demo tại cửa
 
+**Hiện trạng mới nhất 21:46 ngày 02/11:** bản giám sát blur6/confidence0.80 và
+UNKNOWN2ảnh/400ms đã được người dùng yêu cầu mở full luồng. Server đang ARMED,
+camera/AI/Telegram ready, profile `operator-approved-live-20261102`. Có thể test
+trực tiếp trên web; nếu hết phiên sau restart, đăng nhập lại. Đây là approval
+vận hành, chưa là nghiệm thu accuracy/HIL của ngưỡng mới. Thông tin review/demo
+trước nâng cấp phía dưới là lịch sử; không dùng để báo số đo bản mới đã PASS.
+
 **Phạm vi đã duyệt 02/11:** một hồ sơ 10 mẫu đã active trên Oracle, calibration
 `doorstep-demo-v2-20261102-reviewed`. Clear nhận đúng; khẩu trang có thể chưa
 xác định và không còi. User chấp nhận mục người lạ PASS; test còi 1 giây cơ bản đã

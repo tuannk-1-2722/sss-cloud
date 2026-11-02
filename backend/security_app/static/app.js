@@ -82,6 +82,30 @@ function setupMessage(code) {
   return setupMessages[code] || code;
 }
 
+const recognitionMessages = {
+  MATCH_SCORE_AMBIGUOUS: "Điểm nhận diện chưa đủ rõ để kết luận người quen hay người chưa đăng ký.",
+  MATCH_MARGIN_AMBIGUOUS: "Khuôn mặt giống nhiều hồ sơ; chưa phân biệt chắc chắn.",
+  INSUFFICIENT_IDENTITY_EVIDENCE: "Chưa đủ ảnh mặt hợp lệ để xác nhận danh tính.",
+  IDENTITY_EVIDENCE_EXPIRED: "Bằng chứng nhận diện đã cũ; cần ảnh mặt mới.",
+  IDENTITY_EVIDENCE_CONFLICT: "Các ảnh cho kết quả người quen và người chưa đăng ký mâu thuẫn.",
+  IDENTITY_CONFLICT: "Danh tính trong lượt bị mâu thuẫn; cần kiểm tra lại."
+};
+
+function appendRecognitionDetails(row, result) {
+  const code = result.identity_reason;
+  const message = recognitionMessages[code] || enrollmentFeedback[code] || setupMessages[code];
+  if (message) row.append(node("p", message));
+  const counts = result.identity_evidence?.reason_counts || {};
+  const quality = ["FACE_BLURRED", "FACE_TOO_SMALL", "FACE_EXPOSURE", "NO_FACE", "SCENE_TOO_DARK", "SCENE_EXPOSURE_FAILURE", "FACE_ASSOCIATION_AMBIGUOUS"];
+  const reasons = quality.filter(key => counts[key] > 0).map(key => `${labels[key] || enrollmentFeedback[key] || "Chưa thấy mặt"} (${counts[key]} ảnh)`);
+  if (reasons.length) row.append(node("p", `Trong lượt: ${reasons.join(" · ")}`));
+  if (result.geometry_valid === false) {
+    row.append(node("p", "Chưa ghép chắc chắn mặt với thân người; chưa đủ điều kiện xác định chiều tiếp cận để báo động."));
+  } else if (result.direction === "UNRESOLVED") {
+    row.append(node("p", "Chưa xác nhận đường đi từ vùng A đến vùng B để báo động."));
+  }
+}
+
 const enrollmentFeedback = {
   "Face the camera; follow the enrollment guide": "Đưa mặt vào khung bầu dục, nhìn vào camera để bắt đầu thu mẫu.",
   "Round 2: change distance/angle slightly; keep only one person": "Lượt 2: chỉ một người trước camera; đổi nhẹ góc hoặc khoảng cách.",
@@ -526,6 +550,7 @@ async function refresh() {
     for (const track of current.tracks) {
       const row = node("div", undefined, "track");
       row.append(node("strong", track.person_id ? `${labels[track.identity]}: ${peopleById.get(track.person_id) || "Hồ sơ"}` : labels[track.identity]), node("p", `${labels[track.direction]} · vùng ${track.zone}`));
+      appendRecognitionDetails(row, track);
       if (track.visit_id) {
         const b = node("button", "Tắt còi lượt này");
         b.onclick = () => action(b, () => api("/system/silence", "POST", {
@@ -539,6 +564,7 @@ async function refresh() {
     for (const visit of completed.slice(-3).reverse()) {
       const row = node("div", undefined, "track");
       row.append(node("strong", `Lượt đã kết thúc: ${labels[visit.identity] || labels.UNCERTAIN}${visit.person_id ? ` · ${peopleById.get(visit.person_id) || "Hồ sơ"}` : ""}`));
+      appendRecognitionDetails(row, visit);
       tracks.append(row);
     }
     renderEnrollment();
@@ -589,7 +615,10 @@ function renderEvents() {
     row.append(node("h3", labels[event.reason] || event.reason), node("p", new Date(event.created_at).toLocaleString("vi-VN") + " · " + event.source));
     row.append(node("p", `Còi: ${event.details.audible?(labels[event.command?.state]||"Chờ thiết bị"):(event.details.suppression||"Không phát lệnh")}. Thông báo: ${labels[event.notification?.state]||"Trong dashboard"}${event.notification?.reason ? " · " + setupMessage(event.notification.reason) : ""}.`));
     if (event.details.person_id) row.append(node("p", `Người: ${peopleById.get(event.details.person_id) || "Hồ sơ không còn active"}`));
-    if (event.reason === "visit_completed") row.append(node("p", `Kết quả: ${labels[event.details.identity] || labels.UNCERTAIN}`));
+    if (event.reason === "visit_completed") {
+      row.append(node("p", `Kết quả: ${labels[event.details.identity] || labels.UNCERTAIN}`));
+      appendRecognitionDetails(row, event.details);
+    }
     const actions = node("div", undefined, "actions");
     const ack = node("button", event.acknowledged_at ? "Đã xem" : "Đánh dấu đã xem");
     ack.disabled = !!event.acknowledged_at;

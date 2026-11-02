@@ -1,5 +1,58 @@
 # Nhận diện lượt đến cửa ngắn — quyết định 01/11/2026
 
+## Mở full luồng theo chỉ định người vận hành — 21:46 ngày 02/11
+
+Sau thông báo calibration mới chưa qua nghiệm thu thực tế, người dùng chỉ định
+"hãy bật luôn giám sát đi" và "bật full luồng đi, ko giới hạn gì cả". Đã ghi quyết
+định vận hành này và mở đủ camera → AI → policy/event → còi → Telegram hiện có.
+API xác nhận **ARMED**, camera online, model ready, analysis enabled; Telegram
+text/ảnh/known/unresolved ready. Giữ matching, UNKNOWN2/400, geometry/dwell,
+cooldown và các giới hạn còi đã duyệt; không đổi source, firmware hoặc gallery.
+
+Profile vận hành mới `operator-approved-live-20261102` gắn đúng hash config/model
+đang chạy. Đây là **approval vận hành trực tiếp của operator**, không phải kết
+quả accuracy/holdout/HIL mới. Marker `state=validated` là gate vận hành sẵn có;
+report và metrics ghi rõ accuracy/HIL/capacity20 **chưa được nghiệm thu**. Giới
+hạn gallery vận hành theo mức cấu hình 20 do operator yêu cầu mở đầy đủ, trong
+khi số đã dùng để kiểm replay vẫn chỉ 1 người/10 mẫu. Không báo thành đã đo 20.
+Có backup profile cũ và report quyết định riêng trên Oracle. Không sửa seed hoặc
+HIL/holdout report thành PASS. Khóa `CAMERA_PROFILE_CHANGED` của lần triển khai
+21:29 bên dưới đã được thay bằng quyết định vận hành này.
+
+Kích hoạt dùng API admin/CSRF chuẩn, giữ các kiểm tra device/model/gallery và
+audit. Phiên bảo trì local 30 giây đã xóa sau thao tác, không thay password hoặc
+tắt auth. Restart làm hết phiên browser cũ; giám sát chạy độc lập với browser.
+
+## Quyết định bổ sung 02/11 — nới quality giám sát và UNKNOWN 2 ảnh / 400ms
+
+Người dùng đã duyệt phương án trong
+[UNKNOWN_RECOGNITION_REVIEW](UNKNOWN_RECOGNITION_REVIEW.md), chỉ thay một điều:
+UNKNOWN cần **2 ảnh khác nhau trải ít nhất 400ms**. KNOWN thường 3 ảnh/600ms,
+strong-known 2 ảnh/500ms giữ nguyên. Giám sát blur6/detector0.80; enrollment vẫn
+blur60/detector0.90. Model/gallery/matching/person detector/geometry/còi giữ nguyên.
+
+Phần mềm thêm summary reason/số phiếu của lượt và phân biệt identity với thiếu
+geometry/chiều tiếp cận trên UI. Test có cả duplicate, span399/400ms, quality
+fail-closed, chuyển purpose và KNOWN mâu thuẫn sau UNKNOWN không gây alarm mới.
+Các tham số mới đổi camera hash; calibration cũ phải bị chặn, không tự ký lại
+validated từ approval source hoặc replay ảnh đại diện. Accuracy/HIL bản mới cần
+ghi riêng với lịch sử review bên dưới.
+
+**Triển khai 21:29 ngày 02/11:** source mới đã lên Oracle, service/model ready,
+hash source khớp staging, gallery giữ 1 active/10 mẫu; DB schema vẫn 3. Có source
+rollback trong thư mục release riêng, không thay private config/calibration.
+Server khởi động DISARMED; `CAMERA_PROFILE_CHANGED` chặn ARM bằng profile cũ.
+Video/enrollment vẫn dùng được. Không tự gửi thông báo thử hoặc phát alarm.
+
+Kiểm chứng bằng venv: local `tools.check --http` **202 pass/2 skip POSIX**;
+Linux biệt lập **203 pass/1 skip Node**, lint/format/HTTP smoke pass. Node có
+15 ca kiểm parser/lifecycle/UI trên local. Native replay source mới trên 13 JPEG
+khác nhau khớp phương án: 10 observation UNKNOWN, 1 KNOWN, 1 FACE_BLURRED và
+3 NO_FACE; trong UNKNOWN có 5 face-only. Enrollment quality vẫn loại 9 mặt mờ,
+chỉ một mặt known qua. Đây là replay single-frame/metadata, chưa là accuracy
+theo lượt hay HIL. Cần review profile mới với kiểm thực tế người quen/người lạ
+trước ARM; không dùng các lượt trước nâng cấp để tuyên bố gate mới PASS.
+
 ## Review demo lúc 15:47 ngày 02/11/2026
 
 Đã chạy hai lượt test mới sau freeze với cùng model/profile/gallery. Mặt rõ có

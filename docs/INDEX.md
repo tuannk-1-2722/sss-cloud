@@ -2,6 +2,8 @@
 
 Nâng cấp đang thực hiện: [`RECOGNITION_UPGRADE.md`](RECOGNITION_UPGRADE.md) —
 quyết định đã duyệt cho lượt đến cửa ngắn, trace/pilot và gate nhận diện che mặt.
+Điều tra người lạ 02/11: [`UNKNOWN_RECOGNITION_REVIEW.md`](UNKNOWN_RECOGNITION_REVIEW.md) —
+replay ảnh sự kiện 20:05–20:17, blur gate và bản nâng cấp đã duyệt 2 ảnh/400ms.
 Chuẩn bị và thao tác tại trường: [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md).
 Thông báo điện thoại: [`NOTIFICATIONS.md`](NOTIFICATIONS.md) — Telegram, ảnh,
 sự kiện ngắn/người quen, retry, thiết lập bí mật và kiểm nhận trên điện thoại.

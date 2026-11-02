@@ -283,6 +283,17 @@ Các lỗi xác thực/validation không được echo `jpeg`, gallery, token. K
 
 ## Chẩn đoán nhận diện — 01/11/2026
 
+Cập nhật 02/11: status `tracks[]`, `recent_visits[]` và details của
+`visit_completed` thêm metadata tùy chọn `identity_reason`, `geometry_valid`,
+`identity_evidence={observation_counts,reason_counts,known_votes,unknown_votes}`.
+Counts của observation/reason là histogram trong cùng track/lượt; votes là số
+còn trong cửa sổ thời gian. Không chứa vector hoặc reason tùy ý từ client.
+Trace export chỉ giữ vocabulary hữu hạn và count integer không âm. UI cũ có
+thể bỏ qua các field bổ sung; không đổi schema Observation hoặc payload device.
+Reason UNCERTAIN từ matching có thể là `MATCH_SCORE_AMBIGUOUS` hoặc
+`MATCH_MARGIN_AMBIGUOUS`; decision enum vẫn giữ nguyên. Firmware/simulator tiếp
+tục hợp lệ, không phải tính quality hoặc summary này. Không đổi DB schema.
+
 - `Observation` có thêm `evidence` tùy chọn: min_side_px, eye_distance_px,
   blur/eye_blur, clipped, face_confidence, s1/s2; chỉ số hữu hạn, không vector.
   `tracking_reason` tùy chọn mô tả association. Producer/consumer Observation

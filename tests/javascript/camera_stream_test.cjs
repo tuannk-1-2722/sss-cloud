@@ -7,6 +7,26 @@ const streamSource = fs.readFileSync('backend/security_app/static/camera-stream.
 const appSource = fs.readFileSync('backend/security_app/static/app.js', 'utf8');
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const encoder = new TextEncoder();
+
+test('recognition details separate quality history from geometry and hide unknown reason strings', () => {
+  const r = realm(true);
+  r.run(`{
+    const row = document.createElement('div');
+    appendRecognitionDetails(row, {
+      identity_reason: 'MATCH_SCORE_AMBIGUOUS', geometry_valid: false,
+      identity_evidence: {reason_counts: {FACE_BLURRED: 2, 'private-secret': 1}}
+    });
+    globalThis.recognitionText = row.children.map(child => child.textContent).join(' ');
+    const privateRow = document.createElement('div');
+    appendRecognitionDetails(privateRow, {identity_reason: 'private-secret'});
+    globalThis.privateReasonChildren = privateRow.children.length;
+  }`);
+  assert.match(r.context.recognitionText, /Điểm nhận diện/);
+  assert.match(r.context.recognitionText, /2 ảnh/);
+  assert.match(r.context.recognitionText, /thân người/);
+  assert.doesNotMatch(r.context.recognitionText, /private-secret/);
+  assert.equal(r.context.privateReasonChildren, 0);
+});
 function part(id, age = 0, jpeg = new Uint8Array([255, 216, 255, 217]), revision = 2) {
   const head = encoder.encode(`--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpeg.length}\r\nX-Frame-Id: ${id}\r\nX-Frame-Age-Ms: ${age}\r\nX-Video-Revision: ${revision}\r\n\r\n`);
   return Buffer.concat([head, jpeg, Buffer.from('\r\n')]);

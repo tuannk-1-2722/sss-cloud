@@ -64,3 +64,31 @@ def test_diagnostics_requires_admin_and_start_requires_csrf(cfg):
         assert response.headers["cache-control"] == "no-store"
         assert client.delete("/api/v2/diagnostics/recognition", headers=csrf).status_code == 204
         assert not client.get("/api/v2/diagnostics/recognition").json()["trace_active"]
+
+
+def test_whole_visit_summary_is_allowlisted_before_trace_export():
+    trace = RecognitionDiagnostics(history_limit=2, trace_duration_ms=1000)
+    trace.record(
+        "analysis",
+        100,
+        observations=[
+            {
+                "track_id": "private-track",
+                "decision": "UNCERTAIN",
+                "identity_reason": "MATCH_SCORE_AMBIGUOUS",
+                "identity_evidence": {
+                    "observation_counts": {"UNCERTAIN": 2, "private-person": 3},
+                    "reason_counts": {"FACE_BLURRED": 2, "private-secret": 1, "NO_FACE": True},
+                    "embedding": [1, 0],
+                },
+            }
+        ],
+    )
+    row = trace.snapshot(100)["records"][0]["observations"][0]
+    assert row["identity_reason"] == "MATCH_SCORE_AMBIGUOUS"
+    assert row["identity_evidence"] == {
+        "observation_counts": {"UNCERTAIN": 2},
+        "reason_counts": {"FACE_BLURRED": 2},
+    }
+    for value in ("private-person", "private-secret", "embedding"):
+        assert value not in json.dumps(row)

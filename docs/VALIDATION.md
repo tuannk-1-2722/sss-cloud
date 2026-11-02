@@ -156,6 +156,13 @@ Có thể đổi kind thành `unknown`, `unidentified`, `passerby`, `far`, `outg
 
 ## 3. Hiệu chỉnh và freeze profile
 
+Bản quality/UNKNOWN 02/11: giám sát blur6/confidence0.80, enrollment60/0.90,
+UNKNOWN2ảnh/400ms, KNOWN và gate còi giữ nguyên. Trước review profile mới, kiểm
+người quen/khách thật cùng đường A→B với trace metadata; báo riêng false UNKNOWN,
+coverage khi thiếu body, số phiếu/span, event/command/ACK và còi. Test boundary ở
+`test_unknown_upgrade.py` và replay ảnh đại diện không thay accuracy/HIL. Không
+dùng calibration cũ hoặc thay hash của nó để ARM sau đổi quality/temporal.
+
 1. Dừng server; giữ hardware config/runtime đúng. Download + smoke model. Draft gallery đã commit có thể dùng evaluation; không cần bỏ calibration gate để thu dữ liệu.
 2. Chạy validation:
 

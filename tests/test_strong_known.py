@@ -86,13 +86,13 @@ def test_unknown_after_short_confirmation_invalidates_final_known(cfg):
     assert not final[0]["audible"]
 
 
-def test_short_confirmation_does_not_shorten_unknown_alarm_rule(cfg):
+def test_unknown_uses_approved_rule_independently_of_strong_known(cfg):
+    cfg["policy"]["strong_known_enabled"] = False
     engine = PolicyEngine(cfg)
     engine.ingest("one", 0, [obs(A)])
-    engine.ingest("two", 500, [obs(A)])
-    assert engine.tracks["one"].confirmed == "UNCERTAIN"
-    engine.ingest("third", 800, [obs(B)])
+    engine.ingest("two", 400, [obs(A)])
     assert engine.tracks["one"].confirmed == "UNKNOWN"
+    assert not engine.tracks["one"].strong_votes
 
 
 def test_expired_or_previous_visit_strong_votes_cannot_be_reused(cfg):

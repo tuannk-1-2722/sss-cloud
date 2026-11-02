@@ -32,4 +32,9 @@ def match(query, gallery: dict[str, list[np.ndarray]], cfg: dict) -> dict:
         decision, pid = "UNKNOWN", None
     else:
         decision, pid = "UNCERTAIN", None
-    return {"decision": decision, "person_id": pid, "s1": first, "s2": second}
+    reason = (
+        ("MATCH_MARGIN_AMBIGUOUS" if first >= cfg["accept"] else "MATCH_SCORE_AMBIGUOUS")
+        if decision == "UNCERTAIN"
+        else None
+    )
+    return {"decision": decision, "person_id": pid, "s1": first, "s2": second, "reason": reason}

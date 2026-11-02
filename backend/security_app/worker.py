@@ -196,6 +196,8 @@ class VisionWorker:
                                         "known_votes",
                                         "unknown_votes",
                                         "evidence_span_ms",
+                                        "identity_reason",
+                                        "identity_evidence",
                                     }
                                 },
                             }

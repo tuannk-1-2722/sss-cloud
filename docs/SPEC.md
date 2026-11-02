@@ -79,6 +79,14 @@ Với vị trí camera mà center A/B không tách được hoặc thường m�
 
 YuNet chạy độc lập person detector. Gán mặt vào phần trên body khi có đúng một candidate hợp lý; nhiều candidates hoặc nhiều mặt trên body → uncertain. Không thấy mặt → NO_FACE, không UNKNOWN. Face confidence, min size, landmark, blur trên crop 112×112, clipped pixels là quality gate. Không ước lượng yaw chính xác bằng một heuristic chưa đo.
 
+Quyết định 02/11 sau điều tra người lạ: giám sát dùng riêng
+`vision.monitoring_face_confidence=0.80` và `monitoring_blur_min=6`.
+Enrollment giữ `face_confidence=0.90`, `blur_min=60`, mặt tối thiểu 100px.
+Detector phải đặt lại threshold theo purpose ở mỗi lần chạy trên cùng worker;
+ngưỡng giám sát không được rò sang enrollment. Các gate size/landmark/exposure,
+environment và person confidence 0.50 giữ nguyên. Giá trị mới thuộc camera hash;
+approval triển khai không phải bằng chứng accuracy hoặc profile validated mới.
+
 **FR-11 — Open set:** với query q và samples g của mỗi người i:
 
 $$s_i=\max_k q^\top g_{i,k}$$
@@ -86,10 +94,15 @@ $$s_i=\max_k q^\top g_{i,k}$$
 Xếp hạng theo người, không theo sample. `s1` best, `s2` best của **người khác**. Known khi s1 ≥ accept và đủ margin với s2 (gallery một người không cần s2). Unknown khi gallery không rỗng và s1 < reject. Còn lại uncertain. Phải reject < accept. Không gọi cosine là probability.
 
 **FR-12 — Temporal:** mỗi frame khác nhau đóng góp tối đa một bằng chứng;
-window theo vote_window_ms, tối đa128 entries. Confirmation cần confirm_votes
-cùng loại/ID và trải trên confirmation_span_ms (mốc thử600ms). vote_window và
+window theo vote_window_ms, tối đa128 entries. KNOWN thường cần confirm_votes
+cùng ID và trải trên confirmation_span_ms (3 ảnh/600ms). UNKNOWN dùng riêng
+unknown_confirm_votes và unknown_confirmation_span_ms: **2 ảnh khác nhau,
+trải ít nhất 400ms**, được người dùng duyệt ngày 02/11. vote_window và
 vote_spacing_ms cũ chỉ giữ để đọc config tương thích, không điều khiển vote.
 Conflicting known IDs reset; unknown cần không có known ID trong cửa sổ.
+KNOWN mới xuất hiện sau xác nhận UNKNOWN phải hủy quyền UNKNOWN trước khi xét
+alarm mới, cho đến khi đủ bằng chứng xác nhận lại; không dùng UNKNOWN còn treo
+để phát còi sau ảnh KNOWN mâu thuẫn.
 Uncertain/no-face không thành unknown. Identity hết freshness thì uncertain.
 Geometry/tracking/policy dùng cùng observed time, TTL lệnh dùng clock hiện tại.
 
@@ -100,11 +113,20 @@ KNOWN cùng người đã qua quality, có `evidence.s1 >= strong_known_min_scor
 margin tới người thứ hai ít nhất `strong_known_min_margin` (nếu có), trải ít nhất
 `strong_known_span_ms`. Nhánh này không nhận evidence thiếu score, không trộn
 danh tính và không có UNKNOWN trong cửa sổ. Mặc định seed score 0.60, margin 0.16,
-span 500 ms; phải chặt hơn matching thường. UNKNOWN và đường xác nhận thường vẫn
-giữ `confirm_votes`/`confirmation_span_ms` cũ. Duplicate, evidence hết hạn, reset,
+span 500 ms; phải chặt hơn matching thường. Đường KNOWN thường giữ
+`confirm_votes`/`confirmation_span_ms`; UNKNOWN dùng cặp tham số riêng trên.
+Duplicate, evidence hết hạn, reset,
 reentry và revision vẫn giữ nguyên; UNKNOWN mâu thuẫn sau xác nhận rút gọn hủy
 xác nhận đó và làm kết quả cuối chưa xác định. Không cộng phiếu NO_FACE/UNCERTAIN.
 Các tham số này thuộc calibration hash, không dùng profile cũ để tự bật hardware.
+
+Status/completion ghi `identity_reason`, `identity_evidence` với số observation,
+phiếu còn trong cửa sổ và histogram reason toàn lượt/track, vocabulary hữu hạn.
+Ảnh cuối NO_FACE không xóa histogram các ảnh bị quality/score chặn trước đó.
+Matching UNCERTAIN phân biệt `MATCH_SCORE_AMBIGUOUS` và `MATCH_MARGIN_AMBIGUOUS`.
+Lý do identity, geometry và chiều tiếp cận được hiển thị riêng; thông tin chẩn
+đoán không cấp quyền còi, không thêm phiếu hay kéo freshness. Histogram clear
+cùng evidence khi rời lượt ổn định; không mang sang reentry/track/revision mới.
 
 Gallery rỗng hoặc model/calibration lỗi chặn arm; không gọi mọi người là unknown. Threshold trong default là seed. Hardware arm cần validated profile đúng camera/config/model manifest và có report/reviewer.
 

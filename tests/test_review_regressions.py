@@ -134,7 +134,7 @@ def fake_vision(cfg, persons, faces):
     v.cfg = cfg
     v.decode = lambda _: np.zeros((480, 640, 3), np.uint8)
     v.detections = lambda _: (persons, faces)
-    v.faces = lambda _: faces
+    v.faces = lambda _, **_kwargs: faces
     v.quality = lambda *_args, **_kwargs: (np.zeros((112, 112, 3), np.uint8), {"reason": None})
     v.feature = lambda _: np.eye(1, 128, dtype=np.float32).reshape(-1)
     return v
@@ -158,7 +158,7 @@ def test_enrollment_centered_face_outside_monitoring_b_does_not_run_person_model
     v.detections = no_person_detector
     vector, quality = v.enrollment_sample(b"fixture")
     assert vector is not None and quality["reason"] is None
-    v.faces = lambda _: [face, face]
+    v.faces = lambda _, **_kwargs: [face, face]
     vector, quality = v.enrollment_sample(b"fixture")
     assert vector is None and quality["reason"] == "EXACTLY_ONE_FACE_REQUIRED"
 

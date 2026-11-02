@@ -119,9 +119,13 @@ class OpenCVVision:
             )
         return persons, self.faces(image)
 
-    def faces(self, image):
+    def faces(self, image, *, enrollment: bool = False):
         started = time.perf_counter()
         h, w = image.shape[:2]
+        v = self.cfg["vision"]
+        self.face_detector.setScoreThreshold(
+            v["face_confidence"] if enrollment else v["monitoring_face_confidence"]
+        )
         self.face_detector.setInputSize((w, h))
         _, faces = self.face_detector.detect(image)
         if hasattr(self, "last_timings"):
@@ -158,7 +162,7 @@ class OpenCVVision:
             clipped=clipped,
             eye_distance_px=float(np.linalg.norm(landmarks[1] - landmarks[0])),
         )
-        if blur < v["blur_min"]:
+        if blur < (v["blur_min"] if enrollment else v["monitoring_blur_min"]):
             return None, {"reason": "FACE_BLURRED", **metrics}
         if clipped > v["clipped_fraction_max"]:
             return None, {"reason": "FACE_EXPOSURE", **metrics}
@@ -192,7 +196,7 @@ class OpenCVVision:
     def enrollment_sample(self, jpeg: bytes):
         image = self.decode(jpeg)
         self.last_environment = environment_quality(image, self.cfg)
-        faces = self.faces(image)
+        faces = self.faces(image, enrollment=True)
         if len(faces) != 1:
             return None, {"reason": "EXACTLY_ONE_FACE_REQUIRED"}
         face = faces[0]

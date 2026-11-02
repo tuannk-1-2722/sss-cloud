@@ -9,16 +9,21 @@ import math
 import secrets
 from collections import Counter, deque
 
+from .recognition_reasons import IDENTITY_DECISIONS, IDENTITY_REASONS
+
 logger = logging.getLogger(__name__)
 
-REASONS = frozenset(
-    "FACE_TOO_SMALL LANDMARKS_INVALID FACE_CROP_EMPTY FACE_BLURRED FACE_EXPOSURE "
-    "SCENE_TOO_DARK SCENE_EXPOSURE_FAILURE FACE_ASSOCIATION_AMBIGUOUS CAPACITY_EXCEEDED "
-    "EMPTY_GALLERY RESULT_TOO_OLD REVISION_CHANGED MODE_CHANGED REPLACED MODEL_CHANGED "
-    "OBSERVATION_CLOCK_REGRESSED CAPTURE_TOO_OLD ANALYSIS_INTERRUPTED WORKER_FAILED "
-    "EXACTLY_ONE_FACE_REQUIRED FACE_OUTSIDE_GUIDE EMBEDDING_INVALID NO_FACE "
-    "NEW_TRACK MATCHED AMBIGUOUS TYPE_CHANGED TRACK_GAP NO_CANDIDATE "
-    "IDENTITY_CONFLICT INSUFFICIENT_IDENTITY_EVIDENCE".split()
+REASONS = (
+    frozenset(
+        "FACE_TOO_SMALL LANDMARKS_INVALID FACE_CROP_EMPTY FACE_BLURRED FACE_EXPOSURE "
+        "SCENE_TOO_DARK SCENE_EXPOSURE_FAILURE FACE_ASSOCIATION_AMBIGUOUS CAPACITY_EXCEEDED "
+        "EMPTY_GALLERY RESULT_TOO_OLD REVISION_CHANGED MODE_CHANGED REPLACED MODEL_CHANGED "
+        "OBSERVATION_CLOCK_REGRESSED CAPTURE_TOO_OLD ANALYSIS_INTERRUPTED WORKER_FAILED "
+        "EXACTLY_ONE_FACE_REQUIRED FACE_OUTSIDE_GUIDE EMBEDDING_INVALID NO_FACE "
+        "NEW_TRACK MATCHED AMBIGUOUS TYPE_CHANGED TRACK_GAP NO_CANDIDATE "
+        "IDENTITY_CONFLICT INSUFFICIENT_IDENTITY_EVIDENCE".split()
+    )
+    | IDENTITY_REASONS
 )
 NUMBERS = frozenset(
     "frame_seq observed_ms received_ms capture_age_ms reported_capture_age_ms "
@@ -119,6 +124,21 @@ class RecognitionDiagnostics:
                 for key in ("votes", "known_votes", "unknown_votes", "evidence_span_ms"):
                     if number(data.get(key)):
                         item[key] = data[key]
+                if "identity_reason" in data:
+                    item["identity_reason"] = self.reason(data["identity_reason"])
+                if "identity_evidence" in data:
+                    summary = data["identity_evidence"] or {}
+                    item["identity_evidence"] = {
+                        key: {
+                            k: v
+                            for k, v in (summary.get(key) or {}).items()
+                            if k in allowed and type(v) is int and v >= 0
+                        }
+                        for key, allowed in (
+                            ("observation_counts", IDENTITY_DECISIONS),
+                            ("reason_counts", IDENTITY_REASONS),
+                        )
+                    }
                 item["tracking_reason"] = self.reason(data.get("tracking_reason"))
                 row["observations"].append(item)
         self.records.append(row)

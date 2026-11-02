@@ -90,10 +90,10 @@ def test_identity_evidence_uses_distinct_frames_and_elapsed_time(cfg):
     engine = PolicyEngine(cfg)
     engine.ingest("a0", 0, [obs(A, "NOT_CHECKED")])
     engine.ingest("a1", 100, [obs(A, "NOT_CHECKED")])
-    for now in range(200, 800, 100):
+    for now in range(200, 600, 100):
         engine.ingest(f"b{now}", now, [obs(B)])
         assert engine.tracks["one"].confirmed == "UNCERTAIN"
-    engine.ingest("b800", 800, [obs(B)])
+    engine.ingest("b600", 600, [obs(B)])
     assert engine.tracks["one"].confirmed == "UNKNOWN"
 
 
