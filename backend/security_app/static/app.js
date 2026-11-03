@@ -70,6 +70,7 @@ const setupMessages = {
   ALERT_TOO_OLD: "Thông báo quá hạn, không gửi lại cảnh báo cũ.",
   PERSON_DELETED: "Đã hủy thông báo chưa gửi sau khi xóa hồ sơ.",
   PERSON_DELETED_DURING_DELIVERY: "Hồ sơ bị xóa khi đang gửi; cần kiểm tra kết quả trên Telegram.",
+  NOTIFICATION_POLICY: "Đã hủy: chỉ tự động thông báo khi xác nhận người lạ.",
   FRAME_NOT_AVAILABLE: "Chưa có ảnh camera mới; mở video rồi thử lại.",
   CAMERA_PROFILE_CHANGED: "Luồng xử lý hoặc bố trí camera đã thay đổi. Cần kiểm chứng và duyệt lại hồ sơ hiệu chỉnh trước khi bật giám sát. Video và đăng ký mẫu vẫn dùng được.",
   CALIBRATION_REQUIRED: "Chưa có hồ sơ hiệu chỉnh được duyệt. Hãy hoàn tất đăng ký mẫu và kiểm chứng camera trước khi bật giám sát.",
@@ -411,7 +412,7 @@ async function setupPush() {
     const registration = await navigator.serviceWorker.ready;
     pushSubscription = await registration.pushManager.getSubscription();
     if (epoch !== viewEpoch || !csrf) return;
-    help.textContent = "Bật thông báo riêng trên từng điện thoại, rồi bấm Thử thông báo PWA để kiểm tra.";
+    help.textContent = "Chỉ tự động thông báo khi xác nhận người lạ. Bật riêng trên từng điện thoại; nút Thử chỉ kiểm tra kênh nhận.";
     if (pushSubscription) {
       const { endpoint, keys } = pushSubscription.toJSON();
       await api("/push/subscribe", "POST", {endpoint, keys});
@@ -598,7 +599,7 @@ async function refresh() {
     const notifications = current.notifications;
     if (notifications) {
       $("telegram-state").textContent = notifications.ready
-        ? `Đã cấu hình Telegram · ${notifications.photos_enabled ? "có ảnh" : "chỉ nội dung"} · người quen: ${notifications.known_visits_enabled ? "bật" : "tắt"} · lượt chưa xác định: ${notifications.unresolved_visits_enabled ? "bật" : "tắt"}`
+        ? `Đã cấu hình Telegram · ${notifications.photos_enabled ? "có ảnh" : "chỉ nội dung"} · chỉ tự động gửi khi xác nhận người lạ`
         : setupMessage(notifications.reason);
       if (notifications.photo_consent_required) $("telegram-state").textContent += " · cần xác nhận quyền gửi ảnh trên server";
       $("telegram-test").disabled = !notifications.ready;

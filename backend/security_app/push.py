@@ -15,7 +15,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from .notifications import dashboard_link
+from .notifications import cancel_ineligible, dashboard_link
 from .runtime import DomainError
 
 logger = logging.getLogger(__name__)
@@ -301,6 +301,7 @@ class PushNotifier:
     def step(self):
         cfg = self.service.cfg["notifications"]
         with self.service.store.connection() as db:
+            cancel_ineligible(db, push=True)
             row = db.execute(
                 "SELECT o.*,e.reason AS event_reason,e.media_id FROM push_outbox o "
                 "JOIN events e ON o.event_id=e.id WHERE o.state='pending' "

@@ -53,6 +53,40 @@ def response(status=200, **body):
     return httpx.Response(status, json=body or {"ok": True, "result": {"message_id": 42}})
 
 
+@pytest.mark.parametrize("attempts", [0, 1])
+def test_legacy_queue_and_retry_cancel_non_strangers_before_provider(
+    configured, monkeypatch, attempts
+):
+    s = configured
+    s.cfg["notifications"].update(notify_known_visits=True, notify_unresolved_visits=True)
+    blocked = [
+        enqueue(s, reason=reason)
+        for reason in (
+            "known_visit",
+            "unresolved_presence",
+            "capacity_exceeded",
+            "visit_completed",
+            "other",
+        )
+    ]
+    with s.store.connection() as db:
+        db.execute("UPDATE outbox SET attempts=?", (attempts,))
+        # A delayed retry must be cancelled too, before it becomes due.
+        db.execute(
+            "INSERT INTO notification_delivery(outbox_id,next_attempt_at) VALUES(?,?)",
+            (blocked[0], (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()),
+        )
+    allowed = enqueue(s)
+    calls = []
+    monkeypatch.setattr(httpx, "post", lambda *_a, **_kw: calls.append(1) or response())
+    sender(s).step()
+    assert len(calls) == 1 and row(s, allowed)["state"] == "sent"
+    for oid in blocked:
+        cancelled = row(s, oid)
+        assert (cancelled["state"], cancelled["reason"]) == ("cancelled", "NOTIFICATION_POLICY")
+        assert cancelled["attempts"] == attempts
+
+
 def test_disabled_and_missing_credentials_never_call_provider(service, monkeypatch):
     oid = enqueue(service)
     monkeypatch.setattr(httpx, "post", lambda *_a, **_k: pytest.fail("Unexpected provider call"))

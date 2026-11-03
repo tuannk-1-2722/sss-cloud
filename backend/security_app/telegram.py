@@ -58,8 +58,9 @@ def configuration(cfg):
         "photos_enabled": photos,
         "photo_consent_required": cfg["telegram_include_photos"] and not photos,
         "dashboard_link_ready": dashboard_link() is not None,
-        "known_visits_enabled": cfg["notify_known_visits"],
-        "unresolved_visits_enabled": cfg["notify_unresolved_visits"],
+        # Retain response keys for old dashboards; legacy YAML flags cannot opt in.
+        "known_visits_enabled": False,
+        "unresolved_visits_enabled": False,
     }
 
 

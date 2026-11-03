@@ -26,18 +26,41 @@ AI/control và không làm STOP chờ provider. Signed image hết hạn/tắt �
 
 ## Chuẩn bị trước khi mang đi
 
+**Thông báo chốt 03/11:** Telegram/PWA chỉ tự động gửi UNKNOWN đã xác nhận
+(`unknown_approach`, alarm). Known, chưa xác định/che mặt, capacity và completion
+không gửi; tin pending/retry cũ không hợp lệ được hủy. Nút thử là kiểm tra thủ
+công riêng. Hướng dẫn và test ở [NOTIFICATIONS](NOTIFICATIONS.md).
+
 1. Giữ góc camera/ánh sáng/nguồn, gallery hiện tại. Không đổi model/ngưỡng trước
    demo. Xem UI camera online, AI ready và trạng thái ARMED.
 2. Trên mỗi điện thoại mở app, đăng nhập, cấp quyền và bấm Thử PWA một lần. Xác
    nhận OS hiển thị thực tế; đăng ký server thành công chưa là nghiệm thu push.
-3. Một người quen đã đăng ký: đúng danh tính, không alarm. Một người lạ thật:
-   khi confirmed UNKNOWN, kiểm event → command/ACK → còi tự tắt; không cần đi A→B.
+3. Một người quen đã đăng ký: đúng danh tính, không alarm và không push. Che mặt/
+   chưa xác định: không push. Một người lạ thật:
+   khi confirmed UNKNOWN, kiểm event → push Telegram/PWA → command/ACK → còi tự
+   tắt; không cần đi A→B. Push và còi chạy độc lập, không cần chờ nhau.
 4. Giữ cùng một người lạ trước camera: không phát lặp trong lượt; thử STOP.
    Thử PWA/Telegram khi điện thoại khóa màn hình. Không lưu ảnh vào tài liệu Git.
 5. Mang nguồn/cáp và mạng dự phòng. Sau restart server mặc định DISARMED theo
    thiết kế; bật lại giám sát có chủ đích. Đăng nhập lại nếu phiên cũ bị thu hồi.
 
 ## Kiểm chứng và giới hạn
+
+**Bản sửa thông báo 03/11, đã triển khai 16:47 (UTC+7):** local
+`python -m tools.check --http` đạt
+271 passed / 2 skipped (POSIX), Ruff/format, Node UI/service worker, host C++ và
+HTTP/video/auth smoke đạt. Smoke kiểm hai outbox: UNKNOWN được xếp hàng, known
+và chưa xác định không được xếp hàng dù cấu hình cũ bật cờ. Đây là kiểm chứng
+software, không phải điện thoại/HIL. Linux staging đạt 272 passed / 1 skipped
+(thiếu Node; JavaScript đã kiểm trên Windows), lint/format/host C++/HTTP smoke
+đạt. Source được đối chiếu hash trước/sau rollout, có backup riêng trên VM;
+config/calibration/model/khóa push, 2 thuê bao điện thoại và gallery 2 người/20
+mẫu giữ nguyên. Postcheck 16:47: ESP32 online, AI/Telegram/PWA ready, không có
+lỗi worker/push/notification hoặc traceback; không còn pending sai policy.
+Server sau restart đang DISARMED: tải lại app, đăng nhập rồi chủ động bật giám
+sát. Không gửi thông báo thật trong lần kiểm tra này. Cần kiểm lượt người quen/
+chưa xác định im lặng và người lạ nhận đúng push trên điện thoại, cùng còi thật;
+chưa ghi nhận nghiệm thu HIL/phone receipt mới cho bản sửa này.
 
 Đã triển khai source release `624e79b` lên `https://btliot05.duckdns.org` lúc
 22:28 ngày 02/11/2026 (giờ Việt Nam). Kiểm tra sau triển khai lúc 22:33: ARMED,

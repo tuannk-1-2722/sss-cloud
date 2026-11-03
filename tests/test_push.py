@@ -251,6 +251,47 @@ def test_worker_sends_signed_image_and_never_embeds_jpeg(ready_service):
     assert "CẢNH BÁO" in payload["title"] and len(str(payload)) < 1000
 
 
+@pytest.mark.parametrize("attempts", [0, 1])
+def test_legacy_push_queue_cancels_non_strangers_and_per_device_retries(ready_service, attempts):
+    s = ready_service
+    s.cfg["notifications"].update(notify_known_visits=True, notify_unresolved_visits=True)
+    add_subscription(s.store, ENDPOINT, P256DH, AUTH)
+    blocked = [
+        add_event(s, reason=reason)[0]
+        for reason in (
+            "known_visit",
+            "unresolved_presence",
+            "capacity_exceeded",
+            "visit_completed",
+            "other",
+        )
+    ]
+    with s.store.connection() as db:
+        sid = db.execute("SELECT id FROM push_subscriptions").fetchone()[0]
+        db.execute("UPDATE push_outbox SET attempts=?", (attempts,))
+        for eid in blocked:
+            db.execute(
+                "INSERT INTO push_delivery VALUES(?,?,'pending',?,NULL)", (eid, sid, attempts)
+            )
+    allowed, _ = add_event(s)
+    payloads = []
+    notifier = worker(s, lambda _info, payload, *_: payloads.append(payload) or "sent")
+    for _ in range(len(blocked) + 1):
+        notifier.step()
+    assert [p["event_id"] for p in payloads] == [allowed]
+    for eid in blocked:
+        cancelled = outbox(s, eid)
+        assert (cancelled["state"], cancelled["reason"]) == ("cancelled", "NOTIFICATION_POLICY")
+        assert cancelled["attempts"] == attempts
+    with s.store.connection() as db:
+        rows = db.execute(
+            "SELECT state,reason,attempts FROM push_delivery WHERE event_id!=?", (allowed,)
+        ).fetchall()
+        assert [tuple(r) for r in rows] == [("cancelled", "NOTIFICATION_POLICY", attempts)] * len(
+            blocked
+        )
+
+
 def test_worker_omits_image_when_disabled_or_missing(ready_service):
     add_subscription(ready_service.store, ENDPOINT, P256DH, AUTH)
     payloads = []
@@ -413,15 +454,20 @@ def test_worker_fails_closed_without_calling_provider(
     assert (row["state"], row["reason"]) == (state, reason) and not called
 
 
-def test_warning_event_enqueues_push_in_same_transaction(service, monkeypatch):
+@pytest.mark.parametrize(
+    "reason,queued", [("unknown_approach", True), ("unresolved_presence", False)]
+)
+def test_only_unknown_event_enqueues_both_channels_in_same_transaction(
+    service, monkeypatch, reason, queued
+):
     monkeypatch.setattr(
         service.policy,
         "ingest",
         lambda *_: [
             {
                 "visit_id": "push-visit",
-                "reason": "unresolved_presence",
-                "severity": "warning",
+                "reason": reason,
+                "severity": "alarm" if queued else "warning",
                 "audible": False,
             }
         ],
@@ -449,7 +495,8 @@ def test_warning_event_enqueues_push_in_same_transaction(service, monkeypatch):
         rows = db.execute(
             "SELECT p.state FROM push_outbox p JOIN outbox o ON o.event_id=p.event_id"
         ).fetchall()
-    assert [r[0] for r in rows] == ["pending"]
+        assert db.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 1
+    assert [r[0] for r in rows] == (["pending"] if queued else [])
 
 
 @pytest.mark.parametrize(

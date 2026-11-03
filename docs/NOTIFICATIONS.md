@@ -1,10 +1,12 @@
-# Thông báo điện thoại qua Telegram — 02/11/2026
+# Thông báo điện thoại Telegram và PWA — 03/11/2026
 
 ## Phạm vi đã chọn
 
-Operator chọn Telegram, cho phép ảnh camera và muốn báo cả người quen/lượt ngắn
-chưa xác định. AI, điều kiện còi, enrollment, calibration và giao thức ESP32 giữ
-nguyên. Không triển khai Web Push/PWA song song trong đợt này.
+Quyết định 03/11: chỉ tự động gửi khi policy xác nhận người lạ và tạo sự kiện
+`unknown_approach` mức `alarm`. Áp dụng cho cả Telegram và Web Push/PWA trên local,
+simulation và backend Oracle. Người quen, chưa xác định/che mặt, quá số người và
+kết thúc lượt chỉ nằm trong lịch sử, không gửi thông báo. AI, điều kiện còi,
+enrollment, calibration và giao thức ESP32 giữ nguyên bản demo đã chốt.
 
 Telegram dùng client trên điện thoại để nhận thông báo khi web đóng. Tài khoản
 nhận cần mở bot và Start. Bot riêng cho hệ thống tránh xung đột với webhook hoặc
@@ -12,7 +14,7 @@ consumer khác; ghép bằng deep link có mã ngẫu nhiên, chỉ nhận đún
 trong private chat, không chọn người gửi gần nhất tùy ý.
 [Telegram deep linking](https://core.telegram.org/bots/features#deep-linking).
 
-Web Push là một hướng khác: cần subscription từng thiết bị, Push API và service
+Web Push đã được tích hợp: cần subscription từng thiết bị, Push API và service
 worker; iOS/iPadOS hỗ trợ Home Screen web apps từ 16.4 và yêu cầu thao tác người
 dùng khi xin quyền. Cài PWA hiện có không tự tạo push.
 [WebKit](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/),
@@ -34,15 +36,22 @@ flowchart LR
 | Sự kiện | Gửi khi | Ảnh |
 |---|---|---|
 | `unknown_approach` | Alarm event theo policy hiện có | Evidence event nếu còn |
-| `unresolved_presence`, `capacity_exceeded` | Warning event | Evidence event nếu có |
-| `known_visit` | `notify_known_visits=true` | Ảnh tại sự kiện |
-| `visit_completed`, identity UNCERTAIN/UNKNOWN | `notify_unresolved_visits=true`, lượt chưa có thông báo trước đó | Ảnh đại diện của chính lượt |
-| `visit_completed`, identity KNOWN | Không gửi lặp sau known visit | Không tạo ảnh thêm |
+| `unresolved_presence`, `capacity_exceeded` | Không gửi | Chỉ lịch sử |
+| `known_visit` | Không gửi | Chỉ lịch sử |
+| `visit_completed`, mọi identity | Không gửi | Chỉ lịch sử |
 | `notification_test` | Admin bấm Gửi thử, có CSRF/idempotency/rate limit | Checkbox ảnh mới nhất, nếu được phép |
 
-Warning sau đó nâng thành alarm vẫn có thông báo riêng vì mức cảnh báo thay đổi.
-Completion không lặp lại thông báo trước đó của cùng lượt. Test được đánh dấu
+Một ảnh UNKNOWN đơn lẻ chưa đủ kết luận; policy giữ yêu cầu xác nhận của AI đã
+freeze. Warning sau đó thành UNKNOWN xác nhận chỉ gửi thông báo người lạ.
+Completion không gửi lặp. Test được đánh dấu
 `system_test`, không phải phát hiện AI, không tạo lệnh còi hoặc tự ARM.
+Thử PWA chỉ gửi PWA dạng chữ; thử Telegram chỉ gửi Telegram. Xem [PUSH_SETUP](PUSH_SETUP.md).
+
+Các cờ YAML cũ `notify_known_visits`/`notify_unresolved_visits` vẫn được chấp nhận
+để nâng cấp cấu hình, nhưng không thể bật gửi những loại này. Status luôn báo hai
+loại thông báo đó tắt. Worker hủy các row pending/retry cũ không hợp lệ với
+`cancelled / NOTIFICATION_POLICY`, kể cả retry từng điện thoại và retry chưa đến
+hạn. Không sửa lịch sử sent/failed/unknown và không phát lại các row disabled.
 
 Ảnh đại diện giữ trong RAM tối đa bằng số người đồng thời được cấu hình, một ảnh
 mỗi visit; ưu tiên ảnh có mặt/khớp tốt, làm mới khi ảnh ưu tiên quá cũ. Không tạo
@@ -86,8 +95,8 @@ lập xong, chọn:
 notifications:
   telegram_enabled: true
   telegram_include_photos: true
-  notify_known_visits: true
-  notify_unresolved_visits: true
+  notify_known_visits: false
+  notify_unresolved_visits: false
 ```
 
 Token/chat lấy từ environment riêng: `SSS_TELEGRAM_TOKEN`, `SSS_TELEGRAM_CHAT`.
@@ -120,7 +129,9 @@ khi rollback binary phải **giữ migration003** để migration ledger vẫn k
 chép DB/embedding lên máy khác để triển khai. Profile hash không chứa cấu hình
 notifications nên việc bật thông báo không tự làm mất calibration đã duyệt.
 
-Test phủ: định tuyến known/completion, ảnh đúng visit và reset, auth/CSRF,
+Test phủ: UNKNOWN xác nhận vào cả hai outbox cùng transaction; known/completion/
+warning/capacity không gửi dù profile cũ bật cờ; hủy queue/retry cũ, rollback
+transaction không publish, ảnh đúng visit và reset, auth/CSRF,
 idempotency/test rate limit, không tạo còi, thiếu token/consent, photo/text,
 401/403/429/5xx/timeout, expiry/retry cap/restart/lỗi COMMIT, provider chậm không
 giữ STOP, xóa người trong I/O, token log, secure setup. Tất cả provider trong
@@ -133,8 +144,11 @@ Nghiệm thu thật sau triển khai:
    khóa và khi dùng mạng di động, kiểm mute/Do Not Disturb/quyền Telegram.
 3. Gửi thử có ảnh mới, mở nút link: đăng nhập được, video/lịch sử đúng, không có
    token trong URL. `sent` trong DB đối chiếu tin/ảnh thực tế.
-4. Một lượt người quen và một lượt chưa xác định ngắn: đúng loại thông báo, không
-   lặp completion, ảnh không phải người/lượt trước; vẫn giữ chính sách còi.
+4. Một lượt người quen, che mặt/chưa xác định và quá số người: có lịch sử nếu
+   policy tạo event nhưng không nhận thông báo. Một người lạ: sau UNKNOWN xác
+   nhận, nhận đúng ảnh/event trên Telegram và các máy đăng ký PWA; giữ cùng lượt
+   không gửi lặp, hoàn tất lượt không gửi thêm. Một ảnh UNKNOWN chưa xác nhận
+   không gửi. Vẫn giữ chính sách còi.
 5. Lỗi mạng/provider: core tiếp tục, trạng thái lỗi/expiry/unknown đúng; STOP
    hoạt động. Không đánh dấu gửi thành công vì chỉ thấy row đã được xếp hàng.
 
@@ -143,6 +157,9 @@ thông báo hoặc OS hạn chế. Báo riêng provider accepted, operator recei
 luồng AI/thiết bị thực; không tự đánh dấu toàn bộ HIL đạt.
 
 ## Hiện trạng triển khai 02/11/2026
+
+Phần này là bằng chứng lịch sử trước quyết định chỉ gửi người lạ ngày 03/11;
+các thông báo known/completion bên dưới không phải hành vi hiện tại.
 
 - Oracle đã nạp bot/người nhận từ file riêng quyền600 và bật bốn cờ nêu trên
   lúc 17:01 (UTC+7). UI mới có trạng thái Telegram và nút gửi thử, cache được đổi

@@ -52,9 +52,10 @@ sẵn sàng và chế độ ảnh. Bấm **Gửi thử Telegram**, chọn kèm �
 video; xác nhận tin, ảnh và nút mở web trên điện thoại. Thử khi web đóng và điện
 thoại dùng mạng di động. Bật thông báo Telegram, bỏ mute bot nếu cần. Test gửi
 không tự bật giám sát hoặc còi. `Telegram đã nhận` trên web là provider chấp nhận,
-không thay cho việc nhìn thấy tin trên điện thoại. Các lượt known và chưa xác
-định ngắn có thể báo riêng theo [NOTIFICATIONS](NOTIFICATIONS.md); completion
-không gửi lặp nếu lượt đó đã có thông báo.
+không thay cho việc nhìn thấy tin trên điện thoại. Quyết định 03/11 chỉ tự động
+gửi người lạ đã xác nhận qua Telegram/PWA; known, chưa xác định/che mặt, quá số
+người và completion không gửi. Kiểm các lượt này im lặng trên cả hai điện thoại
+theo [NOTIFICATIONS](NOTIFICATIONS.md).
 
 | Lượt | Hành động | Kết quả cần đối chiếu |
 |---|---|---|

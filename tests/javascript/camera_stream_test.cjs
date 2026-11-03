@@ -318,6 +318,7 @@ test('Telegram test is an explicit action, follows photo permission, and never a
   assert.match(r.element('telegram-state').textContent, /Chưa cấu hình/);
   r.status().notifications = {ready: true, photos_enabled: true, known_visits_enabled: true, unresolved_visits_enabled: true};
   await r.run('refresh()');
+  assert.match(r.element('telegram-state').textContent, /chỉ tự động gửi khi xác nhận người lạ/);
   r.element('telegram-test-photo').checked = true;
   await r.element('telegram-test').onclick({target:r.element('telegram-test')});
   const sent = r.requests.filter(x => x.url.endsWith('/notifications/test'));

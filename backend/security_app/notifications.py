@@ -16,17 +16,30 @@ from .telegram import telegram_message as telegram_message
 logger = logging.getLogger(__name__)
 
 
-def should_notify(decision, cfg, prior_notification=False):
-    if decision["severity"] in {"warning", "alarm"}:
-        return True
-    if decision["reason"] == "known_visit":
-        return cfg["notify_known_visits"]
-    return (
-        cfg["notify_unresolved_visits"]
-        and not prior_notification
-        and decision["reason"] == "visit_completed"
-        and decision.get("identity") in {"UNCERTAIN", "UNKNOWN"}
+def should_notify(decision):
+    """Only the policy's confirmed UNKNOWN event may notify automatically."""
+    return decision["reason"] == "unknown_approach" and decision["severity"] == "alarm"
+
+
+def cancel_ineligible(db, *, push=False):
+    """Apply current policy to durable queues, including retries from older releases.
+
+    Explicit admin tests remain available for setup. Completed/uncertain deliveries
+    retain their history; cancellation must never claim to recall a sent message.
+    """
+    table = "push_outbox" if push else "outbox"
+    db.execute(
+        f"UPDATE {table} SET state='cancelled',reason='NOTIFICATION_POLICY' "
+        "WHERE state='pending' AND event_id NOT IN ("
+        "SELECT id FROM events WHERE (reason='unknown_approach' AND severity='alarm') "
+        "OR (reason='notification_test' AND source='system_test'))"
     )
+    if push:
+        db.execute(
+            "UPDATE push_delivery SET state='cancelled',reason='NOTIFICATION_POLICY' "
+            "WHERE state='pending' AND event_id IN ("
+            "SELECT event_id FROM push_outbox WHERE state='cancelled' AND reason='NOTIFICATION_POLICY')"
+        )
 
 
 def status(service):
@@ -145,6 +158,7 @@ class Notifier:
         s, now = self.service, datetime.now(timezone.utc)
         cfg = s.cfg["notifications"]
         with s.lock, s.store.connection() as db:
+            cancel_ineligible(db)
             # Only one sender exists. A leftover claim from a failed previous iteration is uncertain.
             db.execute(
                 "UPDATE outbox SET state='unknown',reason='DELIVERY_STATE_LOST' WHERE state='sending'"

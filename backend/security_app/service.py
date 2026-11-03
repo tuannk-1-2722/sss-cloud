@@ -895,11 +895,7 @@ class SecurityService:
                         db.execute(
                             "INSERT OR IGNORE INTO cloud_outbox(event_id) VALUES(?)", (event_id,)
                         )
-                    prior = db.execute(
-                        "SELECT 1 FROM outbox o JOIN events e ON o.event_id=e.id WHERE e.visit_id=? LIMIT 1",
-                        (decision["visit_id"],),
-                    ).fetchone()
-                    if should_notify(decision, self.cfg["notifications"], bool(prior)):
+                    if should_notify(decision):
                         db.execute(
                             "INSERT OR IGNORE INTO outbox(id,event_id,state,attempts,created_at,reason) VALUES(?,?,'pending',0,?,NULL)",
                             (str(uuid4()), event_id, utcnow()),

@@ -3,6 +3,9 @@
 Bản PWA/Web Push từ `main` được ghép với AI đã được operator test ổn. Cùng một
 sự kiện có thể gửi tới cả hai điện thoại; mỗi thiết bị phải đăng ký riêng.
 Không cần đăng ký lại khuôn mặt. Telegram tiếp tục hoạt động độc lập.
+Từ quyết định 03/11, cả hai kênh chỉ tự động gửi khi xác nhận người lạ
+(`unknown_approach` mức alarm); người quen, chưa xác định, quá số người và kết
+thúc lượt không gửi. Nút Thử vẫn gửi thủ công để kiểm tra kênh nhận.
 
 ## 1. Cài và cấp quyền trên từng điện thoại
 

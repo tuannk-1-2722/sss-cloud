@@ -121,6 +121,7 @@ cloud:
 notifications:
   telegram_enabled: false
   telegram_include_photos: false
+  # Legacy keys accepted for existing profiles; automatic notifications are UNKNOWN-only.
   notify_known_visits: false
   notify_unresolved_visits: false
   push_enabled: false

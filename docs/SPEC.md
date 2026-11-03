@@ -180,8 +180,11 @@ freshness/revision và hard OFF không đổi. Acknowledge không silence.
 **FR-19 — Local alarm:** independent task kiểm deadline, không đợi upload/network. OFF khi boot/disarm/enrollment/mất control; test tối đa test cap khi DISARMED. GPIO owner duy nhất, active level theo module thực. Queue ACK bounded; overflow đưa OFF và phải có HIL report. Không cấp công suất buzzer từ GPIO.
 
 **EX-01 — Telegram:** outbox unique event, disabled mặc định. Text và ảnh opt-in
-qua consent riêng; warning/alarm luôn thuộc loại gửi, known và completion chưa
-xác định có cờ riêng, tránh lặp completion sau cảnh báo của cùng visit. Retry có
+qua consent riêng. Từ quyết định 03/11, Telegram và Web Push chỉ tự động gửi
+`unknown_approach` mức alarm khi policy xác nhận UNKNOWN. Known, warning/capacity
+và completion mọi identity không gửi; cờ YAML cũ không bật lại các loại này.
+Worker hủy pending/retry cũ không hợp lệ với `NOTIFICATION_POLICY`; lịch sử gửi
+được giữ. Nút thử admin là thao tác thủ công riêng, không phát hiện AI. Retry có
 lịch lưu bền, max attempts/expiry; HTTP429 theo retry_after cho cả chat. Timeout
 có thể gây trùng khi retry; crash/lỗi lưu trạng thái lúc gửi phải báo unknown.
 Provider sent không phải phone read. Không log token/ảnh/vector, không điều khiển

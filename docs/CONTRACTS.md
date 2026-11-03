@@ -10,6 +10,14 @@ History `notification` thêm next_attempt_at/delivered_at/media_kind/duplicate_p
 `sent` là provider accepted, không là điện thoại đã đọc. Device contract không đổi.
 Xem [NOTIFICATIONS](NOTIFICATIONS.md).
 
+Quyết định thông báo 03/11: chỉ tự động xếp cả hai outbox cho
+`reason=unknown_approach, severity=alarm` (UNKNOWN được policy xác nhận).
+`known_visits_enabled` và `unresolved_visits_enabled` luôn false, kể cả YAML cũ
+bật cờ. Pending/retry không hợp lệ chuyển `cancelled`, reason
+`NOTIFICATION_POLICY`; ledger PWA pending tương ứng cũng bị hủy. Sent/unknown
+giữ lịch sử. `notification_test` chỉ được worker gửi khi source `system_test`,
+qua endpoint admin thủ công; không có thay đổi schema hoặc device wire contract.
+
 Base `/api/v2`. Wire identifiers tiếng Anh; JSON UTF-8, extra fields bị từ chối ở request Pydantic. UUID/session là opaque. Một board `device_id` slug theo config. Thời gian server UTC cho history; timeout dùng monotonic/uptime, không trừ UTC cho millis.
 
 **Cập nhật 31/10/2026:** video liên tục dùng giao thức ở mục 7 bên dưới. Hello/

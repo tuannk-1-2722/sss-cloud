@@ -7,10 +7,12 @@ import json
 import os
 import secrets
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import time
+from contextlib import closing
 from pathlib import Path
 
 import httpx
@@ -33,7 +35,10 @@ def wait_for(function, timeout=12):
 def run(root: Path) -> dict:
     runtime = root / "runtime"
     config = root / "config.yaml"
-    config.write_text("profile: simulation\nruntime_dir: " + runtime.as_posix() + "\n")
+    config.write_text(
+        "profile: simulation\nruntime_dir: " + runtime.as_posix() + "\n"
+        "notifications:\n  notify_known_visits: true\n  notify_unresolved_visits: true\n"
+    )
     password = secrets.token_urlsafe(24)
     env = dict(
         os.environ,
@@ -175,6 +180,17 @@ def run(root: Path) -> dict:
                             report["scenarios"].append(
                                 {"scenario": scenario, "event": reason, "audible": False}
                             )
+                        # Disabled channels still retain eligible outbox entries. Check both
+                        # queues without contacting a provider, even with legacy flags enabled.
+                        with closing(sqlite3.connect(runtime / "security.sqlite3")) as db:
+                            for table in ("outbox", "push_outbox"):
+                                queued = db.execute(
+                                    f"SELECT COUNT(*) FROM {table} WHERE event_id=?", (event["id"],)
+                                ).fetchone()[0]
+                                assert queued == int(reason == "unknown_approach")
+                        report["scenarios"][-1]["notification_eligible"] = (
+                            reason == "unknown_approach"
+                        )
                         current = client.get("status").json()
                         client.put(
                             "system/mode",
